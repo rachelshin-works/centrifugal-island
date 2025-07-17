@@ -33,4 +33,13 @@ services:
         value: websocket
       - path: /*
         name: Connection
-        value: Upgrade 
+        value: Upgrade
+      - path: /*
+        name: Access-Control-Allow-Origin
+        value: "*"
+      - path: /*
+        name: Access-Control-Allow-Methods
+        value: "GET, POST, OPTIONS"
+      - path: /*
+        name: Access-Control-Allow-Headers
+        value: "Content-Type, Upgrade, Connection" 

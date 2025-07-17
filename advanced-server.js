@@ -409,16 +409,63 @@ wss.on('error', (error) => {
     console.error('WebSocket 서버 오류:', error);
 });
 
+// Server-Sent Events 엔드포인트 (WebSocket 대안)
+app.get('/events', (req, res) => {
+    res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Cache-Control'
+    });
+
+    // 클라이언트에게 연결 확인
+    res.write('data: {"type": "connected"}\n\n');
+
+    // 클라이언트를 SSE 클라이언트 목록에 추가
+    const clientId = Date.now();
+    const client = { id: clientId, res: res };
+    
+    if (!app.sseClients) {
+        app.sseClients = new Map();
+    }
+    app.sseClients.set(clientId, client);
+
+    // 클라이언트 연결 해제 시 정리
+    req.on('close', () => {
+        app.sseClients.delete(clientId);
+    });
+});
+
+// SSE 클라이언트들에게 색상 전송
+function sendToSSEClients(color) {
+    if (app.sseClients) {
+        app.sseClients.forEach((client, id) => {
+            try {
+                client.res.write(`data: ${JSON.stringify(color)}\n\n`);
+            } catch (error) {
+                console.error('SSE 클라이언트 전송 오류:', error);
+                app.sseClients.delete(id);
+            }
+        });
+    }
+}
+
 // 주기적으로 색상 분석 및 전송
 setInterval(async () => {
     const color = await captureAndAnalyzeAdvanced();
     if (color) {
         console.log('평균 색상:', color);
+        
+        // WebSocket 클라이언트들에게 전송
         wss.clients.forEach(client => {
             if (client.readyState === WebSocket.OPEN) {
                 client.send(JSON.stringify(color));
             }
         });
+        
+        // SSE 클라이언트들에게도 전송
+        sendToSSEClients(color);
     }
 }, config.issUpdateInterval); // 설정된 간격으로 업데이트
 
