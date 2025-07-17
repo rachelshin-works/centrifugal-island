@@ -21,42 +21,40 @@ const wss = new WebSocket.Server({ server });
 // ISS YouTube 라이브 스트림 URL
 const ISS_STREAM_URL = 'https://www.youtube.com/watch?v=fO9e9jnhYK8';
 
-// ISS 색상 시뮬레이션 (현실적인 버전)
-function getSimulatedISSSColor() {
-    const time = Date.now();
-    const hour = new Date().getHours();
+// 미묘한 톤의 색상 팔레트 (보라색 제거)
+const subtleColors = [
+    { r: 120, g: 120, b: 125 },  // 미묘한 회색톤
+    { r: 140, g: 160, b: 180 },  // 하늘색 톤
+    { r: 100, g: 130, b: 150 },  // 바다톤
+    { r: 150, g: 140, b: 120 },  // 갈색톤
+    { r: 130, g: 140, b: 160 },  // 회청색 톤
+    { r: 160, g: 150, b: 140 },  // 베이지톤
+    { r: 110, g: 140, b: 160 },  // 청회색 톤
+    { r: 140, g: 130, b: 110 }   // 모래톤
+];
+
+let currentColorIndex = 0;
+let colorChangeTime = Date.now();
+const COLOR_DURATION = 180000; // 3분 (밀리초)
+
+// 미묘한 톤의 색상 시뮬레이션
+function getSubtleColor() {
+    const now = Date.now();
     
-    // 시간대별 색상 변화
-    if (hour >= 6 && hour <= 18) {
-        // 낮 시간대 - 지구와 우주
-        const colors = [
-            { r: 0, g: 100, b: 200 },    // 지구 대기권 (파랑)
-            { r: 100, g: 150, b: 50 },   // 대륙 (녹색)
-            { r: 200, g: 200, b: 100 },  // 구름 (흰색)
-            { r: 255, g: 255, b: 255 },  // 태양광 반사 (흰색)
-            { r: 50, g: 100, b: 150 },   // 바다 (어두운 파랑)
-            { r: 150, g: 200, b: 255 }   // 하늘 (밝은 파랑)
-        ];
-        return colors[Math.floor(time / 4000) % colors.length];
-    } else {
-        // 밤 시간대 - 우주와 도시 불빛
-        const colors = [
-            { r: 0, g: 0, b: 0 },        // 우주 (검정)
-            { r: 20, g: 20, b: 40 },     // 어두운 우주
-            { r: 50, g: 50, b: 100 },    // 밤의 지구 (어두운 파랑)
-            { r: 100, g: 50, b: 50 },    // 도시 불빛 (붉은색)
-            { r: 30, g: 30, b: 60 },     // 별빛 반사
-            { r: 80, g: 40, b: 80 }      // 오로라 효과
-        ];
-        return colors[Math.floor(time / 5000) % colors.length];
+    // 3분마다 색상 변경
+    if (now - colorChangeTime > COLOR_DURATION) {
+        currentColorIndex = (currentColorIndex + 1) % subtleColors.length;
+        colorChangeTime = now;
     }
+    
+    return subtleColors[currentColorIndex];
 }
 
 // 프레임 캡처 및 색상 분석 (시뮬레이션 모드)
 async function captureAndAnalyze() {
     try {
         // 시뮬레이션된 색상 반환
-        const simulatedColor = getSimulatedISSSColor();
+        const simulatedColor = getSubtleColor();
         return simulatedColor;
         
     } catch (error) {
@@ -78,13 +76,13 @@ function broadcastColor(color) {
     });
 }
 
-// 주기적으로 색상 분석 및 전송
+// 주기적으로 색상 분석 및 전송 (3분마다)
 setInterval(async () => {
     const color = await captureAndAnalyze();
     if (color) {
         broadcastColor(color);
     }
-}, 2000); // 2초마다 업데이트
+}, COLOR_DURATION);
 
 // API 엔드포인트
 app.get('/average-color', async (req, res) => {
