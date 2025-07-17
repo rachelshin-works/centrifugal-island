@@ -55,19 +55,8 @@ function getSimulatedISSSColor() {
 // 프레임 캡처 및 색상 분석 (시뮬레이션 모드)
 async function captureAndAnalyze() {
     try {
-        console.log('ISS 스트림 색상 분석 중...');
-        
-        // YouTube 스트림 정보 확인 (연결 테스트)
-        try {
-            const info = await ytdl.getInfo(ISS_STREAM_URL);
-            console.log('ISS 스트림 연결 확인됨');
-        } catch (error) {
-            console.log('ISS 스트림 연결 실패, 시뮬레이션 모드로 실행');
-        }
-        
         // 시뮬레이션된 색상 반환
         const simulatedColor = getSimulatedISSSColor();
-        
         return simulatedColor;
         
     } catch (error) {
@@ -93,7 +82,6 @@ function broadcastColor(color) {
 setInterval(async () => {
     const color = await captureAndAnalyze();
     if (color) {
-        console.log('평균 색상:', color);
         broadcastColor(color);
     }
 }, 2000); // 2초마다 업데이트
@@ -120,9 +108,7 @@ app.get('/', (req, res) => {
 // 서버 시작
 server.listen(PORT, () => {
     console.log(`ISS Live Background 서버가 포트 ${PORT}에서 실행 중입니다.`);
-    console.log(`웹소켓 서버가 포트 ${PORT}에서 실행 중입니다.`);
     console.log(`브라우저에서 http://localhost:${PORT}를 열어보세요.`);
-    console.log('현재 시뮬레이션 모드로 실행 중입니다.');
 });
 
 // WebSocket 연결 처리

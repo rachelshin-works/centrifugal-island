@@ -55,7 +55,6 @@
 <body>
     <div id="info">
         <p>Real-time Color: <span id="current-color">Waiting...</span><span id="color-display" class="color-box"></span></p>
-        <p>Connection Status: <span id="connection-status">Connecting...</span></p>
     </div>
     
     <div id="status">
@@ -68,8 +67,6 @@
         let targetColor = { r: 0, g: 0, b: 0 };
         let ws = null;
         let isConnected = false;
-        let reconnectAttempts = 0;
-        const maxReconnectAttempts = 5;
         
         // WebSocket 연결 설정
         function connectWebSocket() {
@@ -80,13 +77,11 @@
             // 로컬 개발 환경과 배포 환경 구분
             let wsUrl;
             if (host === 'localhost' || host === '127.0.0.1') {
-                wsUrl = `ws://localhost:8080`;
+                wsUrl = `ws://localhost:3000`;
             } else {
                 // 배포 환경에서는 같은 호스트의 웹소켓 사용
                 wsUrl = `${protocol}//${host}:${port}`.replace(':80', '').replace(':443', '');
             }
-            
-            console.log('WebSocket 연결 시도:', wsUrl);
             
             try {
                 ws = new WebSocket(wsUrl);
@@ -94,9 +89,6 @@
                 ws.onopen = function() {
                     console.log('WebSocket 연결됨');
                     isConnected = true;
-                    reconnectAttempts = 0;
-                    document.getElementById('connection-status').textContent = 'Connected (Live)';
-                    document.getElementById('connection-status').style.color = '#00ff00';
                 };
                 
                 ws.onmessage = function(event) {
@@ -112,32 +104,19 @@
                 };
                 
                 ws.onclose = function() {
-                    console.log('WebSocket 연결 해제됨');
+                    console.log('WebSocket 연결 해제됨, 시뮬레이션 모드로 전환');
                     isConnected = false;
-                    document.getElementById('connection-status').textContent = 'Disconnected (Simulation)';
-                    document.getElementById('connection-status').style.color = '#ff0000';
-                    
-                    // 재연결 시도
-                    if (reconnectAttempts < maxReconnectAttempts) {
-                        reconnectAttempts++;
-                        console.log(`재연결 시도 ${reconnectAttempts}/${maxReconnectAttempts}`);
-                        setTimeout(connectWebSocket, 3000);
-                    } else {
-                        console.log('최대 재연결 시도 횟수 초과, 시뮬레이션 모드로 전환');
-                        startSimulation();
-                    }
+                    startSimulation();
                 };
                 
                 ws.onerror = function(error) {
-                    console.log('WebSocket 오류:', error);
-                    document.getElementById('connection-status').textContent = 'Error (Simulation)';
-                    document.getElementById('connection-status').style.color = '#ff0000';
+                    console.log('WebSocket 오류, 시뮬레이션 모드로 전환');
+                    isConnected = false;
+                    startSimulation();
                 };
                 
             } catch (error) {
-                console.error('WebSocket 연결 실패:', error);
-                document.getElementById('connection-status').textContent = 'Failed (Simulation)';
-                document.getElementById('connection-status').style.color = '#ff0000';
+                console.error('WebSocket 연결 실패, 시뮬레이션 모드로 전환');
                 startSimulation();
             }
         }
@@ -152,7 +131,7 @@
                     console.log('WebSocket 연결 시간 초과, 시뮬레이션 모드로 전환');
                     startSimulation();
                 }
-            }, 5000);
+            }, 3000);
         }
         
         function draw() {
