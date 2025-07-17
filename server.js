@@ -3,6 +3,7 @@ const cors = require('cors');
 const ytdl = require('ytdl-core');
 const WebSocket = require('ws');
 const path = require('path');
+const http = require('http');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -11,8 +12,11 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.static('public'));
 
-// WebSocket 서버 생성
-const wss = new WebSocket.Server({ port: 8080 });
+// HTTP 서버 생성
+const server = http.createServer(app);
+
+// WebSocket 서버를 HTTP 서버에 연결
+const wss = new WebSocket.Server({ server });
 
 // ISS YouTube 라이브 스트림 URL
 const ISS_STREAM_URL = 'https://www.youtube.com/watch?v=fO9e9jnhYK8';
@@ -110,13 +114,13 @@ app.get('/status', (req, res) => {
 });
 
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 // 서버 시작
-app.listen(PORT, () => {
+server.listen(PORT, () => {
     console.log(`ISS Live Background 서버가 포트 ${PORT}에서 실행 중입니다.`);
-    console.log(`웹소켓 서버가 포트 8080에서 실행 중입니다.`);
+    console.log(`웹소켓 서버가 포트 ${PORT}에서 실행 중입니다.`);
     console.log(`브라우저에서 http://localhost:${PORT}를 열어보세요.`);
     console.log('현재 시뮬레이션 모드로 실행 중입니다.');
 });
