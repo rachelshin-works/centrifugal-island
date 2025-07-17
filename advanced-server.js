@@ -14,8 +14,30 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.static('public'));
 
-// WebSocket 서버 생성
-const wss = new WebSocket.Server({ port: 8080 });
+// Express 서버 생성
+const server = app.listen(PORT, () => {
+    console.log(`ISS Live Background 서버가 포트 ${PORT}에서 실행 중입니다.`);
+    console.log(`웹소켓 서버가 포트 ${PORT}에서 실행 중입니다.`);
+    console.log('고급 모드로 실행 중입니다 (실제 ISS 스트림 캡처 시도).');
+    
+    // 서버 시작 시 YouTube를 먼저 열기
+    const { exec } = require('child_process');
+    exec('open https://www.youtube.com/watch?v=fO9e9jnhYK8', (error) => {
+        if (error) {
+            console.log('YouTube 자동 열기 실패:', error.message);
+        } else {
+            console.log('YouTube ISS 스트림이 새 탭에서 열렸습니다.');
+        }
+    });
+    
+    // 3초 후 웹페이지 안내
+    setTimeout(() => {
+        console.log(`이제 브라우저에서 http://localhost:${PORT}를 열어보세요.`);
+    }, 3000);
+});
+
+// WebSocket 서버를 Express 서버에 연결
+const wss = new WebSocket.Server({ server });
 
 // ISS YouTube 라이브 스트림 URL (더 많은 URL 추가)
 const ISS_STREAM_URLS = [
@@ -378,28 +400,6 @@ app.get('/status', (req, res) => {
 
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-// 서버 시작
-app.listen(PORT, () => {
-    console.log(`ISS Live Background 서버가 포트 ${PORT}에서 실행 중입니다.`);
-    console.log(`웹소켓 서버가 포트 8080에서 실행 중입니다.`);
-    console.log('고급 모드로 실행 중입니다 (실제 ISS 스트림 캡처 시도).');
-    
-    // 서버 시작 시 YouTube를 먼저 열기
-    const { exec } = require('child_process');
-    exec('open https://www.youtube.com/watch?v=fO9e9jnhYK8', (error) => {
-        if (error) {
-            console.log('YouTube 자동 열기 실패:', error.message);
-        } else {
-            console.log('YouTube ISS 스트림이 새 탭에서 열렸습니다.');
-        }
-    });
-    
-    // 3초 후 웹페이지 안내
-    setTimeout(() => {
-        console.log(`이제 브라우저에서 http://localhost:${PORT}를 열어보세요.`);
-    }, 3000);
 });
 
 // WebSocket 연결 처리
