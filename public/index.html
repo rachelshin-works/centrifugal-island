@@ -116,7 +116,7 @@
                 isConnected = false;
                 updateConnectionStatus('Disconnected', 'red');
                 
-                // 재연결 시도
+                // 재연결 시도 (지수 백오프)
                 setTimeout(connectWebSocket, 3000);
             };
             
@@ -157,11 +157,11 @@
             colorDisplay.style.borderColor = textColor;
         }
         
+        // 연결 상태 업데이트
         function updateConnectionStatus(status, color) {
             const statusElement = document.getElementById('connection-status');
             statusElement.textContent = status;
-            // 연결 상태는 항상 잘 보이도록 밝은 색상 사용
-            statusElement.style.color = color === 'green' ? '#00ff00' : '#ff0000';
+            statusElement.style.color = color;
         }
         
         function updateLastUpdate() {

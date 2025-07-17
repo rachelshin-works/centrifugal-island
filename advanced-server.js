@@ -26,7 +26,11 @@ const ISS_STREAM_URLS = [
     'https://www.youtube.com/watch?v=21X5lGlDOfg',  // NASA Live: Earth from Space
     'https://www.youtube.com/watch?v=qtl0WxQqJqE',  // ISS Live: Space Station Cam
     'https://www.youtube.com/watch?v=EEIk7gwjgIM',  // ISS Live: Earth Views
-    'https://www.youtube.com/watch?v=1-fVoQKqKNE'   // ISS Live: Space Station Live
+    'https://www.youtube.com/watch?v=1-fVoQKqKNE',  // ISS Live: Space Station Live
+    'https://www.youtube.com/watch?v=6AviDjR9mmo',  // ISS Live: Space Station
+    'https://www.youtube.com/watch?v=86YLFOog4GM',  // NASA Live: Earth from Space
+    'https://www.youtube.com/watch?v=4jKokxPRtck',  // ISS Live: Space Station
+    'https://www.youtube.com/watch?v=UdnTZO_c-TY'   // ISS Live: International Space Station
 ];
 
 // 임시 디렉토리 생성
@@ -282,7 +286,7 @@ async function captureAndAnalyzeAdvanced() {
                 // 색상 유효성 검사 (더 관대한 조건)
                 if (color && (color.r >= 0 && color.g >= 0 && color.b >= 0)) {
                     // 검은색이 아닌 경우 (임계값을 더 낮게 설정)
-                    if (color.r > 5 || color.g > 5 || color.b > 5) {
+                    if (color.r > 1 || color.g > 1 || color.b > 1) {
                         console.log('실제 색상 추출 성공:', color);
                         return color;
                     } else {
@@ -402,6 +406,9 @@ app.listen(PORT, () => {
 wss.on('connection', (ws) => {
     console.log('새로운 WebSocket 클라이언트 연결됨');
     
+    // 연결 상태 추적
+    ws.isAlive = true;
+    
     // 연결 즉시 현재 색상 전송
     captureAndAnalyzeAdvanced().then(color => {
         if (color) {
@@ -413,10 +420,34 @@ wss.on('connection', (ws) => {
         }
     });
     
+    // 클라이언트로부터 ping 받기
+    ws.on('pong', () => {
+        ws.isAlive = true;
+    });
+    
     ws.on('close', () => {
         console.log('WebSocket 클라이언트 연결 해제됨');
+        ws.isAlive = false;
+    });
+    
+    ws.on('error', (error) => {
+        console.error('WebSocket 오류:', error);
+        ws.isAlive = false;
     });
 });
+
+// WebSocket 연결 상태 확인 (30초마다)
+setInterval(() => {
+    wss.clients.forEach((ws) => {
+        if (ws.isAlive === false) {
+            console.log('비활성 WebSocket 연결 종료');
+            return ws.terminate();
+        }
+        
+        ws.isAlive = false;
+        ws.ping();
+    });
+}, 30000);
 
 // 프로세스 종료 시 정리
 process.on('SIGINT', () => {
