@@ -88,12 +88,46 @@
         }
 
         function tryConnectServer() {
-            // WebSocket 문제가 있으므로 바로 SSE로 연결
-            trySSE();
+            // 1. WebSocket 우선 시도 (배포 환경용)
+            let wsProtocol = (location.protocol === 'https:') ? 'wss' : 'ws';
+            let wsUrl = wsProtocol + '://' + location.host + '/ws';
+            console.log('WebSocket 연결 시도:', wsUrl);
+            ws = new WebSocket(wsUrl);
+            ws.onopen = function() {
+                console.log('WebSocket 연결 성공!');
+                serverConnected = true;
+                document.getElementById('connection-status').textContent = 'Live (WebSocket)';
+            };
+            ws.onmessage = function(event) {
+                try {
+                    let color = JSON.parse(event.data);
+                    if (color && typeof color.r === 'number') {
+                        console.log('서버에서 색상 받음:', color);
+                        targetColor = color;
+                        updateLastUpdate();
+                    }
+                } catch (e) {
+                    console.log('메시지 파싱 오류:', e);
+                }
+            };
+            ws.onerror = function(error) {
+                console.log('WebSocket 오류:', error);
+                ws.close();
+            };
+            ws.onclose = function() {
+                console.log('WebSocket 연결 해제됨');
+                if (!serverConnected) {
+                    // 2. SSE fallback
+                    trySSE();
+                } else {
+                    document.getElementById('connection-status').textContent = 'Disconnected';
+                    startSimulation();
+                }
+            };
         }
 
         function trySSE() {
-            console.log('SSE 연결 시도 중...');
+            console.log('SSE 연결 시도...');
             sse = new EventSource('/events');
             sse.onopen = function() {
                 console.log('SSE 연결 성공!');
@@ -118,15 +152,6 @@
                 document.getElementById('connection-status').textContent = 'Simulation Mode';
                 startSimulation();
             };
-        }
-
-        function startSimulation() {
-            if (serverConnected) return;
-            setInterval(() => {
-                targetColor = getSimulatedISSColor();
-                updateLastUpdate();
-            }, 3000);
-            targetColor = getSimulatedISSColor();
         }
         
         // ISS Color Simulation (realistic version)
@@ -232,6 +257,15 @@
             const now = new Date();
             const timeString = now.toLocaleTimeString();
             document.getElementById('last-update').textContent = timeString;
+        }
+
+        function startSimulation() {
+            if (serverConnected) return;
+            setInterval(() => {
+                targetColor = getSimulatedISSColor();
+                updateLastUpdate();
+            }, 3000);
+            targetColor = getSimulatedISSColor();
         }
     </script>
 </body>
