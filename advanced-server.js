@@ -14,8 +14,11 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.static('public'));
 
-// WebSocket 서버 생성
-const wss = new WebSocket.Server({ port: 8080 });
+// HTTP 서버 생성
+const server = require('http').createServer(app);
+
+// WebSocket 서버를 HTTP 서버에 연결
+const wss = new WebSocket.Server({ server });
 
 // ISS YouTube 라이브 스트림 URL (더 많은 URL 추가)
 const ISS_STREAM_URLS = [
@@ -377,9 +380,9 @@ app.get('/', (req, res) => {
 });
 
 // 서버 시작
-app.listen(PORT, () => {
+server.listen(PORT, () => {
     console.log(`ISS Live Background 서버가 포트 ${PORT}에서 실행 중입니다.`);
-    console.log(`웹소켓 서버가 포트 8080에서 실행 중입니다.`);
+    console.log(`웹소켓 서버가 HTTP 서버와 함께 실행 중입니다.`);
     console.log('고급 모드로 실행 중입니다 (실제 ISS 스트림 캡처 시도).');
     
     // 서버 시작 시 YouTube를 먼저 열기
