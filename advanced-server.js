@@ -35,24 +35,22 @@ function getAverageColor(imageData) {
     let r = 0, g = 0, b = 0;
     const data = imageData.data;
     
-    // 더 정확한 샘플링을 위해 중앙 영역만 사용
+    // 전체 이미지에서 샘플링 (더 많은 픽셀 사용)
     const width = imageData.width;
     const height = imageData.height;
-    const centerX = Math.floor(width / 2);
-    const centerY = Math.floor(height / 2);
-    const sampleSize = Math.min(width, height) / 4;
+    const totalPixels = width * height;
+    
+    // 샘플링 간격을 줄여서 더 많은 픽셀 사용
+    const sampleStep = Math.max(1, Math.floor(totalPixels / 10000)); // 최대 10,000개 픽셀 샘플링
     
     let count = 0;
     
-    for (let y = centerY - sampleSize; y < centerY + sampleSize; y += 2) {
-        for (let x = centerX - sampleSize; x < centerX + sampleSize; x += 2) {
-            const index = (y * width + x) * 4;
-            if (index < data.length - 3) {
-                r += data[index];
-                g += data[index + 1];
-                b += data[index + 2];
-                count++;
-            }
+    for (let i = 0; i < data.length; i += sampleStep * 4) {
+        if (i + 2 < data.length) {
+            r += data[i];
+            g += data[i + 1];
+            b += data[i + 2];
+            count++;
         }
     }
     
@@ -60,11 +58,16 @@ function getAverageColor(imageData) {
         return { r: 0, g: 0, b: 0 };
     }
     
-    return {
+    const avgColor = {
         r: Math.round(r / count),
         g: Math.round(g / count),
         b: Math.round(b / count)
     };
+    
+    // 디버깅을 위한 로그
+    console.log(`이미지 크기: ${width}x${height}, 샘플링된 픽셀: ${count}, 평균 색상:`, avgColor);
+    
+    return avgColor;
 }
 
 // yt-dlp를 사용한 스트림 URL 가져오기 (개선된 버전)
@@ -121,13 +124,15 @@ async function captureFrameWithFFmpeg() {
             const outputPath = `${tempDir}/frame_${Date.now()}.jpg`;
             
             return new Promise((resolve, reject) => {
-                // FFmpeg로 프레임 캡처 (타임아웃 설정)
+                // FFmpeg로 프레임 캡처 (HLS 스트림에 최적화된 설정)
                 const ffmpeg = spawn('ffmpeg', [
                     '-i', streamUrl,
                     '-vframes', '1',
-                    '-q:v', '2',
+                    '-q:v', '1',  // 더 높은 품질
                     '-y',
-                    '-timeout', '10000000', // 10초 타임아웃
+                    '-avoid_negative_ts', 'make_zero',
+                    '-fflags', '+genpts',
+                    '-r', '1',  // 1fps로 설정
                     outputPath
                 ]);
                 
@@ -172,11 +177,11 @@ async function captureFrameWithFFmpeg() {
                     resolve(null);
                 });
                 
-                // 15초 후 타임아웃
+                // 20초 후 타임아웃 (더 긴 시간)
                 setTimeout(() => {
                     ffmpeg.kill();
                     resolve(null);
-                }, 15000);
+                }, 20000);
             });
             
         } catch (error) {
@@ -198,12 +203,33 @@ async function captureAndAnalyzeAdvanced() {
         // FFmpeg를 사용한 실제 캡처 시도
         const color = await captureFrameWithFFmpeg();
         
-        if (color && (color.r > 0 || color.g > 0 || color.b > 0)) {
-            return color;
-        } else {
-            console.log('유효한 색상을 추출하지 못함, 시뮬레이션 모드로 전환');
-            return getSimulatedISSSColor();
+        // 색상 유효성 검사를 더 관대하게 수정
+        if (color && (color.r >= 0 && color.g >= 0 && color.b >= 0)) {
+            // 검은색이 아닌 경우에만 반환 (임계값을 더 낮게 설정)
+            if (color.r > 1 || color.g > 1 || color.b > 1) {
+                console.log('실제 색상 추출 성공:', color);
+                return color;
+            } else {
+                console.log('검은색 프레임 감지, 다른 스트림 시도');
+                // 다른 스트림 URL 시도
+                for (let i = 1; i < ISS_STREAM_URLS.length; i++) {
+                    try {
+                        console.log(`대체 스트림 ${i + 1} 시도 중: ${ISS_STREAM_URLS[i]}`);
+                        const altColor = await captureFrameWithFFmpeg();
+                        if (altColor && (altColor.r > 1 || altColor.g > 1 || altColor.b > 1)) {
+                            console.log('대체 스트림에서 색상 추출 성공:', altColor);
+                            return altColor;
+                        }
+                    } catch (error) {
+                        console.log(`대체 스트림 ${i + 1} 실패:`, error.message);
+                        continue;
+                    }
+                }
+            }
         }
+        
+        console.log('모든 스트림에서 유효한 색상을 추출하지 못함, 시뮬레이션 모드로 전환');
+        return getSimulatedISSSColor();
         
     } catch (error) {
         console.error('고급 프레임 캡처 오류:', error);
@@ -285,8 +311,22 @@ app.get('/', (req, res) => {
 app.listen(PORT, () => {
     console.log(`ISS Live Background 서버가 포트 ${PORT}에서 실행 중입니다.`);
     console.log(`웹소켓 서버가 포트 8080에서 실행 중입니다.`);
-    console.log(`브라우저에서 http://localhost:${PORT}를 열어보세요.`);
     console.log('고급 모드로 실행 중입니다 (실제 ISS 스트림 캡처 시도).');
+    
+    // 서버 시작 시 YouTube를 먼저 열기
+    const { exec } = require('child_process');
+    exec('open https://www.youtube.com/watch?v=fO9e9jnhYK8', (error) => {
+        if (error) {
+            console.log('YouTube 자동 열기 실패:', error.message);
+        } else {
+            console.log('YouTube ISS 스트림이 새 탭에서 열렸습니다.');
+        }
+    });
+    
+    // 3초 후 웹페이지 안내
+    setTimeout(() => {
+        console.log(`이제 브라우저에서 http://localhost:${PORT}를 열어보세요.`);
+    }, 3000);
 });
 
 // WebSocket 연결 처리

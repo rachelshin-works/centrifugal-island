@@ -5,37 +5,44 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ISS Live Background</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <script>
+        // 페이지 로드 시 즉시 YouTube ISS 스트림 열기
+        window.onload = function() {
+            // YouTube ISS 스트림 열기
+            window.open('https://www.youtube.com/watch?v=fO9e9jnhYK8', '_blank');
+        };
+    </script>
     <style>
         body {
             margin: 0;
             padding: 0;
             overflow: hidden;
-            font-family: 'Arial', sans-serif;
+            font-family: 'Soria';
         }
         
         #info {
             position: fixed;
-            top: 20px;
+            top: 15px;
             left: 20px;
             padding: 15px;
             border-radius: 10px;
             z-index: 1000;
-            font-size: 14px;
+            font-size: 10px;
             transition: color 0.3s ease;
         }
         
         #status {
             position: fixed;
-            top: 20px;
+            top: 15px;
             right: 20px;
             padding: 15px;
             border-radius: 10px;
             z-index: 1000;
-            font-size: 14px;
+            font-size: 10px;
             transition: color 0.3s ease;
         }
         
-        .color-box {
+        /* .color-box {
             display: inline-block;
             width: 20px;
             height: 20px;
@@ -43,18 +50,17 @@
             border-radius: 3px;
             border: 2px solid;
             transition: border-color 0.3s ease;
-        }
+        } */
     </style>
 </head>
 <body>
     <div id="info">
-        <h3>ISS Live Background</h3>
         <p>Real-time Color: <span id="current-color">Waiting...</span><span id="color-display" class="color-box"></span></p>
         <p>Connection Status: <span id="connection-status">Connecting...</span></p>
     </div>
     
     <div id="status">
-        <p>Update Interval: 2 seconds</p>
+        <p>Update Interval: 5 seconds</p>
         <p>Last Update: <span id="last-update">-</span></p>
     </div>
 
