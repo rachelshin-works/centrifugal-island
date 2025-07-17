@@ -78,6 +78,7 @@ function getAverageColor(imageData) {
 // yt-dlp를 사용한 스트림 URL 가져오기 (개선된 버전)
 async function getStreamUrl(url) {
     return new Promise((resolve, reject) => {
+        // 먼저 yt-dlp 시도
         const ytdlp = spawn('yt-dlp', [
             '--get-url',
             '--format', 'worst[height<=480]',
@@ -99,20 +100,24 @@ async function getStreamUrl(url) {
         ytdlp.on('close', (code) => {
             if (code !== 0) {
                 console.log(`yt-dlp 실패 (${code}): ${errorOutput}`);
-                reject(new Error(`yt-dlp 실패: ${errorOutput}`));
+                // yt-dlp가 실패하면 직접 URL 사용 시도
+                console.log('yt-dlp 없이 직접 URL 사용 시도');
+                resolve(url);
                 return;
             }
             
             if (streamUrl && streamUrl.startsWith('http')) {
                 resolve(streamUrl);
             } else {
-                reject(new Error('유효하지 않은 스트림 URL'));
+                console.log('유효하지 않은 스트림 URL, 직접 URL 사용');
+                resolve(url);
             }
         });
         
         ytdlp.on('error', (error) => {
             console.error('yt-dlp 오류:', error);
-            reject(error);
+            console.log('yt-dlp 없이 직접 URL 사용');
+            resolve(url);
         });
     });
 }
