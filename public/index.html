@@ -93,7 +93,7 @@
         }
         
         function connectWebSocket() {
-            // 동적으로 WebSocket URL 결정
+            // 동적으로 WebSocket URL 생성
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const host = window.location.hostname;
             const port = window.location.port || (protocol === 'wss:' ? '443' : '80');
