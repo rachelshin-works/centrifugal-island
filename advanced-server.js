@@ -14,19 +14,7 @@ const HOST = config.host;
 
 // CORS 설정 - 모든 도메인 허용 (개발/배포 환경 모두 지원)
 app.use(cors({
-    origin: function (origin, callback) {
-        // 개발 환경에서는 모든 origin 허용
-        if (!origin || config.nodeEnv === 'development') {
-            return callback(null, true);
-        }
-        
-        // 배포 환경에서는 설정된 도메인만 허용
-        if (config.allowedOrigins.indexOf(origin) !== -1) {
-            callback(null, true);
-        } else {
-            callback(new Error('CORS policy violation'));
-        }
-    },
+    origin: '*',
     credentials: true
 }));
 

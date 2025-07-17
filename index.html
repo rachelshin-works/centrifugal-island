@@ -66,27 +66,88 @@
     <script>
         let currentColor = { r: 0, g: 0, b: 0 };
         let targetColor = { r: 0, g: 0, b: 0 };
-        
+        let ws = null;
+        let sse = null;
+        let serverConnected = false;
+
         function setup() {
             createCanvas(windowWidth, windowHeight);
-            startSimulation();
+            tryConnectServer();
         }
-        
+
         function draw() {
-            // Smooth color transitions
             currentColor.r = lerp(currentColor.r, targetColor.r, 0.05);
             currentColor.g = lerp(currentColor.g, targetColor.g, 0.05);
             currentColor.b = lerp(currentColor.b, targetColor.b, 0.05);
-            
-            // Draw background
             background(currentColor.r, currentColor.g, currentColor.b);
-            
-            // Update UI
             updateUI();
         }
-        
+
         function windowResized() {
             resizeCanvas(windowWidth, windowHeight);
+        }
+
+        function tryConnectServer() {
+            // 1. WebSocket 우선 시도
+            let wsProtocol = (location.protocol === 'https:') ? 'wss' : 'ws';
+            let wsUrl = wsProtocol + '://' + location.host;
+            ws = new WebSocket(wsUrl);
+            ws.onopen = function() {
+                serverConnected = true;
+                document.getElementById('connection-status').textContent = 'Live (WebSocket)';
+            };
+            ws.onmessage = function(event) {
+                try {
+                    let color = JSON.parse(event.data);
+                    if (color && typeof color.r === 'number') {
+                        targetColor = color;
+                        updateLastUpdate();
+                    }
+                } catch (e) {}
+            };
+            ws.onerror = function() {
+                ws.close();
+            };
+            ws.onclose = function() {
+                if (!serverConnected) {
+                    // 2. SSE fallback
+                    trySSE();
+                } else {
+                    document.getElementById('connection-status').textContent = 'Disconnected';
+                    startSimulation();
+                }
+            };
+        }
+
+        function trySSE() {
+            sse = new EventSource('/events');
+            sse.onopen = function() {
+                serverConnected = true;
+                document.getElementById('connection-status').textContent = 'Live (SSE)';
+            };
+            sse.onmessage = function(event) {
+                try {
+                    let color = JSON.parse(event.data);
+                    if (color && typeof color.r === 'number') {
+                        targetColor = color;
+                        updateLastUpdate();
+                    }
+                } catch (e) {}
+            };
+            sse.onerror = function() {
+                sse.close();
+                document.getElementById('connection-status').textContent = 'Simulation Mode';
+                startSimulation();
+            };
+        }
+
+        function startSimulation() {
+            if (serverConnected) return;
+            setInterval(() => {
+                targetColor = getSimulatedISSColor();
+                updateLastUpdate();
+            }, 3000);
+            targetColor = getSimulatedISSColor();
         }
         
         // ISS Color Simulation (realistic version)
@@ -155,17 +216,6 @@
                     b: Math.round(currentColor.b * (1 - blend) + nextColor.b * blend)
                 };
             }
-        }
-        
-        function startSimulation() {
-            // Update color every 3 seconds
-            setInterval(() => {
-                targetColor = getSimulatedISSColor();
-                updateLastUpdate();
-            }, 3000);
-            
-            // Initial color
-            targetColor = getSimulatedISSColor();
         }
         
         // Color brightness calculation
