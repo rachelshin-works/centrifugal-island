@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ISS Live Background - Centrifugal Island</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <script>
+        // Auto-open ISS stream when page loads
+        window.onload = function() {
+            window.open('https://www.youtube.com/watch?v=fO9e9jnhYK8', '_blank');
+        };
+    </script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: 'Arial', sans-serif;
+        }
+        
+        #info {
+            position: fixed;
+            top: 15px;
+            left: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            z-index: 1000;
+            font-size: 10px;
+            transition: color 0.3s ease;
+        }
+        
+        #status {
+            position: fixed;
+            top: 15px;
+            right: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            z-index: 1000;
+            font-size: 10px;
+            transition: color 0.3s ease;
+        }
+        
+        .color-box {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            margin-left: 10px;
+            border-radius: 3px;
+            border: 2px solid;
+            transition: border-color 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <p>Real-time Color: <span id="current-color">Waiting...</span><span id="color-display" class="color-box"></span></p>
+        <p>Connection Status: <span id="connection-status">Simulation Mode</span></p>
+    </div>
+    
+    <div id="status">
+        <p>Update Interval: 3 seconds</p>
+        <p>Last Update: <span id="last-update">-</span></p>
+    </div>
+
+    <script>
+        let currentColor = { r: 0, g: 0, b: 0 };
+        let targetColor = { r: 0, g: 0, b: 0 };
+        
+        function setup() {
+            createCanvas(windowWidth, windowHeight);
+            startSimulation();
+        }
+        
+        function draw() {
+            // Smooth color transitions
+            currentColor.r = lerp(currentColor.r, targetColor.r, 0.05);
+            currentColor.g = lerp(currentColor.g, targetColor.g, 0.05);
+            currentColor.b = lerp(currentColor.b, targetColor.b, 0.05);
+            
+            // Draw background
+            background(currentColor.r, currentColor.g, currentColor.b);
+            
+            // Update UI
+            updateUI();
+        }
+        
+        function windowResized() {
+            resizeCanvas(windowWidth, windowHeight);
+        }
+        
+        // ISS Color Simulation (realistic version)
+        function getSimulatedISSColor() {
+            const time = Date.now();
+            const hour = new Date().getHours();
+            
+            // Time-based color changes
+            if (hour >= 6 && hour <= 18) {
+                // Day time - Earth and space
+                const colors = [
+                    { r: 0, g: 100, b: 200 },    // Earth atmosphere (blue)
+                    { r: 100, g: 150, b: 50 },   // Continents (green)
+                    { r: 200, g: 200, b: 100 },  // Clouds (white)
+                    { r: 255, g: 255, b: 255 },  // Sunlight reflection (white)
+                    { r: 50, g: 100, b: 150 }    // Ocean (dark blue)
+                ];
+                return colors[Math.floor(time / 3000) % colors.length];
+            } else {
+                // Night time - space and city lights
+                const colors = [
+                    { r: 0, g: 0, b: 0 },        // Space (black)
+                    { r: 20, g: 20, b: 40 },     // Dark space
+                    { r: 50, g: 50, b: 100 },    // Night Earth (dark blue)
+                    { r: 100, g: 50, b: 50 },    // City lights (red)
+                    { r: 30, g: 30, b: 60 }      // Starlight reflection
+                ];
+                return colors[Math.floor(time / 4000) % colors.length];
+            }
+        }
+        
+        function startSimulation() {
+            // Update color every 3 seconds
+            setInterval(() => {
+                targetColor = getSimulatedISSColor();
+                updateLastUpdate();
+            }, 3000);
+            
+            // Initial color
+            targetColor = getSimulatedISSColor();
+        }
+        
+        // Color brightness calculation
+        function getBrightness(r, g, b) {
+            // Human eye sensitivity weighted brightness calculation
+            return (r * 0.299 + g * 0.587 + b * 0.114);
+        }
+        
+        // Text color determination
+        function getTextColor(r, g, b) {
+            const brightness = getBrightness(r, g, b);
+            return brightness > 128 ? '#000000' : '#ffffff';
+        }
+        
+        function updateUI() {
+            const colorText = `RGB(${Math.round(currentColor.r)}, ${Math.round(currentColor.g)}, ${Math.round(currentColor.b)})`;
+            document.getElementById('current-color').textContent = colorText;
+            
+            const colorDisplay = document.getElementById('color-display');
+            colorDisplay.style.backgroundColor = `rgb(${Math.round(currentColor.r)}, ${Math.round(currentColor.g)}, ${Math.round(currentColor.b)})`;
+            
+            // Update text color
+            const textColor = getTextColor(currentColor.r, currentColor.g, currentColor.b);
+            const infoElement = document.getElementById('info');
+            const statusElement = document.getElementById('status');
+            
+            infoElement.style.color = textColor;
+            statusElement.style.color = textColor;
+            
+            // Update color box border
+            colorDisplay.style.borderColor = textColor;
+        }
+        
+        function updateLastUpdate() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString();
+            document.getElementById('last-update').textContent = timeString;
+        }
+    </script>
+</body>
+</html> 

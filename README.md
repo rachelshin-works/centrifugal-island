@@ -1,187 +1,209 @@
 # ISS Live Background
 
-ISS(국제우주정거장) 실시간 영상의 픽셀 평균값을 분석하여 웹 배경을 동적으로 변경하는 프로젝트입니다.
+A real-time dynamic web background that extracts colors from the International Space Station (ISS) live stream and creates an immersive visual experience.
 
-## 🚀 기능
+🌍 **Live Demo**: [https://centrifugal-island.nyc](https://centrifugal-island.nyc)
 
-- **실시간 색상 분석**: ISS YouTube 라이브 스트림에서 프레임을 캡처하여 평균 색상 계산
-- **동적 배경 변경**: p5.js를 사용한 부드러운 배경색 전환
-- **WebSocket 실시간 통신**: 서버와 클라이언트 간 실시간 데이터 전송
-- **시각적 효과**: 우주 테마의 입자 애니메이션
-- **반응형 UI**: 실시간 색상 정보 및 연결 상태 표시
+## Features
 
-## 📋 요구사항
+- **Real-time Color Extraction**: Captures and analyzes colors from the ISS live stream
+- **Dynamic Background**: Smooth color transitions based on actual ISS footage
+- **Adaptive Text**: Text color automatically adjusts based on background brightness
+- **Live Stream Integration**: Automatically opens the ISS live stream in a new tab
+- **WebSocket Real-time Updates**: Instant color updates every 5 seconds
+- **Responsive Design**: Works on all devices and screen sizes
 
-### 기본 요구사항
-- Node.js 16.0 이상
-- npm 또는 yarn
+## How It Works
 
-### 고급 기능 (실제 스트림 캡처)
+1. **Stream Capture**: Uses FFmpeg and yt-dlp to capture frames from ISS live streams
+2. **Color Analysis**: Analyzes the captured frames to extract dominant colors
+3. **Real-time Updates**: Sends color data via WebSocket to connected clients
+4. **Dynamic Background**: Smoothly transitions the background color based on ISS footage
+5. **Smart Text**: Automatically switches text color (white/black) based on background brightness
+
+## Technology Stack
+
+- **Backend**: Node.js, Express, WebSocket
+- **Frontend**: HTML5, CSS3, JavaScript, p5.js
+- **Stream Processing**: FFmpeg, yt-dlp
+- **Image Analysis**: Canvas API
+- **Deployment**: GitHub Pages
+
+## Installation
+
+### Prerequisites
+
+- Node.js (v14 or higher)
 - FFmpeg
 - yt-dlp
 
-## 🛠️ 설치
+### Setup
 
-1. **의존성 설치**
-```bash
-npm install
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/rachelshin-works/centrifugal-island.git
+   cd centrifugal-island
+   ```
+
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+3. **Install system dependencies**
+   ```bash
+   # macOS (using Homebrew)
+   brew install ffmpeg yt-dlp
+   
+   # Ubuntu/Debian
+   sudo apt update
+   sudo apt install ffmpeg
+   pip install yt-dlp
+   ```
+
+4. **Run the server**
+   ```bash
+   # For simulation mode (basic)
+   npm start
+   
+   # For advanced mode (real ISS stream capture)
+   node advanced-server.js
+   ```
+
+5. **Open in browser**
+   - Navigate to `http://localhost:3000`
+   - The ISS live stream will automatically open in a new tab
+
+## Usage
+
+### Basic Mode (Simulation)
+- Runs `server.js` for color simulation based on time of day
+- No external dependencies required
+- Perfect for testing and development
+
+### Advanced Mode (Real Stream)
+- Runs `advanced-server.js` for actual ISS stream capture
+- Requires FFmpeg and yt-dlp
+- Extracts real colors from ISS live feeds
+
+## API Endpoints
+
+- `GET /` - Main web interface
+- `GET /status` - Server status and client count
+- `GET /average-color` - Current average color (JSON)
+- `WebSocket ws://localhost:8080` - Real-time color updates
+
+## ISS Stream Sources
+
+The application tries multiple ISS live stream sources:
+- [ISS Live: Earth from Space](https://www.youtube.com/watch?v=fO9e9jnhYK8)
+- [ISS Live: NASA Earth Views](https://www.youtube.com/watch?v=86YLFOog4GM)
+- [ISS Live: Space Station](https://www.youtube.com/watch?v=4jKokxPRtck)
+
+## Customization
+
+### Color Transition Speed
+Modify the lerp factor in `public/index.html`:
+```javascript
+currentColor.r = lerp(currentColor.r, targetColor.r, 0.05); // 0.05 = slow, 0.2 = fast
 ```
 
-2. **고급 기능을 위한 추가 도구 설치 (선택사항)**
-
-macOS:
-```bash
-# Homebrew 사용
-brew install ffmpeg
-brew install yt-dlp
+### Update Interval
+Change the update frequency in `advanced-server.js`:
+```javascript
+setInterval(async () => {
+    // ... color analysis
+}, 5000); // 5 seconds
 ```
 
-Ubuntu/Debian:
-```bash
-sudo apt update
-sudo apt install ffmpeg
-pip install yt-dlp
+### Text Color Threshold
+Adjust brightness threshold in `public/index.html`:
+```javascript
+function getTextColor(r, g, b) {
+    const brightness = getBrightness(r, g, b);
+    return brightness > 128 ? '#000000' : '#ffffff'; // 128 = medium brightness
+}
 ```
 
-## 🚀 실행
+## Deployment
 
-### 기본 모드 (시뮬레이션)
+### GitHub Pages
+
+1. **Enable GitHub Pages**
+   - Go to repository Settings > Pages
+   - Select source: "Deploy from a branch"
+   - Choose branch: "main" and folder: "/ (root)"
+
+2. **Custom Domain Setup**
+   - Add custom domain: `centrifugal-island.nyc`
+   - Create CNAME file in repository root
+   - Configure DNS settings with your domain provider
+
+3. **DNS Configuration**
+   ```
+   Type: CNAME
+   Name: @
+   Value: rachelshin-works.github.io
+   ```
+
+### Local Development
+
+For local development without stream capture:
 ```bash
 npm start
 ```
 
-### 고급 모드 (실제 스트림 캡처)
+For full ISS stream integration:
 ```bash
 node advanced-server.js
 ```
 
-### 개발 모드 (자동 재시작)
-```bash
-npm run dev
-```
+## Troubleshooting
 
-## 🌐 접속
+### Common Issues
 
-서버 실행 후 브라우저에서 다음 주소로 접속:
-- **웹 인터페이스**: http://localhost:3000
-- **API 엔드포인트**: http://localhost:3000/average-color
-- **상태 확인**: http://localhost:3000/status
+1. **"yt-dlp 실패" (yt-dlp failure)**
+   - Ensure yt-dlp is installed: `pip install yt-dlp`
+   - Update yt-dlp: `pip install --upgrade yt-dlp`
 
-## 📁 프로젝트 구조
+2. **"FFmpeg 캡처 실패" (FFmpeg capture failure)**
+   - Verify FFmpeg installation: `ffmpeg -version`
+   - Check network connectivity
 
-```
-iss-live-background/
-├── server.js              # 기본 서버 (시뮬레이션 모드)
-├── advanced-server.js     # 고급 서버 (실제 스트림 캡처)
-├── package.json           # 프로젝트 설정
-├── README.md             # 프로젝트 문서
-└── public/
-    └── index.html        # 웹 클라이언트 (p5.js)
-```
+3. **Black frames detected**
+   - ISS stream might be offline or restricted
+   - System automatically falls back to simulation mode
 
-## 🔧 API 엔드포인트
+4. **WebSocket connection issues**
+   - Ensure port 8080 is available
+   - Check firewall settings
 
-### GET /average-color
-현재 ISS 스트림의 평균 색상을 JSON 형태로 반환
+### Performance Optimization
 
-**응답 예시:**
-```json
-{
-  "r": 100,
-  "g": 150,
-  "b": 200,
-  "timestamp": 1640995200000,
-  "source": "iss-stream"
-}
-```
+- Reduce update frequency for better performance
+- Lower image resolution for faster processing
+- Use simulation mode for development
 
-### GET /status
-서버 상태 정보를 반환
+## Contributing
 
-**응답 예시:**
-```json
-{
-  "status": "running",
-  "clients": 2,
-  "timestamp": 1640995200000
-}
-```
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
 
-## 🎨 색상 분석 알고리즘
+## License
 
-1. **프레임 캡처**: YouTube 라이브 스트림에서 주기적으로 프레임 추출
-2. **중앙 영역 샘플링**: 이미지 중앙 영역의 픽셀만 샘플링하여 성능 최적화
-3. **평균 계산**: RGB 채널별 평균값 계산
-4. **부드러운 전환**: 클라이언트에서 lerp 함수를 사용한 부드러운 색상 전환
+MIT License - see LICENSE file for details
 
-## 🌟 시뮬레이션 모드
+## Acknowledgments
 
-실제 스트림 캡처가 불가능한 경우, 시간대별로 현실적인 ISS 색상을 시뮬레이션:
+- NASA for providing ISS live streams
+- YouTube for hosting the live feeds
+- p5.js community for the creative coding framework
 
-- **낮 시간대 (6-18시)**: 지구 대기권, 대륙, 구름, 태양광 반사
-- **밤 시간대 (18-6시)**: 우주, 밤의 지구, 도시 불빛, 별빛 반사
+---
 
-## 🎮 인터랙션
+**Experience the Earth from space in real-time colors** 🌍✨
 
-- **마우스 클릭**: 클릭한 위치에 입자 효과 추가
-- **실시간 정보**: 화면 좌상단에 현재 색상 정보 표시
-- **연결 상태**: 우상단에 WebSocket 연결 상태 표시
-
-## 🔧 설정 옵션
-
-### 서버 설정
-- `PORT`: 웹 서버 포트 (기본값: 3000)
-- `ISS_STREAM_URL`: ISS YouTube 라이브 스트림 URL
-
-### 클라이언트 설정
-- 업데이트 주기: 2-3초
-- 색상 전환 속도: 0.05 (lerp 계수)
-- 입자 개수: 50개
-
-## 🐛 문제 해결
-
-### 일반적인 문제
-
-1. **포트 충돌**
-   ```bash
-   # 다른 포트 사용
-   PORT=3001 npm start
-   ```
-
-2. **의존성 오류**
-   ```bash
-   # node_modules 삭제 후 재설치
-   rm -rf node_modules package-lock.json
-   npm install
-   ```
-
-3. **Canvas 모듈 오류 (macOS)**
-   ```bash
-   # Xcode Command Line Tools 설치
-   xcode-select --install
-   ```
-
-### 고급 기능 문제
-
-1. **FFmpeg 오류**
-   - FFmpeg가 올바르게 설치되었는지 확인
-   - `ffmpeg -version` 명령어로 설치 확인
-
-2. **yt-dlp 오류**
-   - yt-dlp가 최신 버전인지 확인
-   - `yt-dlp --version` 명령어로 설치 확인
-
-## 📝 라이선스
-
-MIT License
-
-## 🤝 기여
-
-버그 리포트나 기능 제안은 이슈로 등록해주세요.
-
-## 📞 지원
-
-문제가 발생하면 다음을 확인해주세요:
-1. Node.js 버전이 16.0 이상인지 확인
-2. 모든 의존성이 올바르게 설치되었는지 확인
-3. 포트 3000과 8080이 사용 가능한지 확인 
+Visit: [https://centrifugal-island.nyc](https://centrifugal-island.nyc) 
