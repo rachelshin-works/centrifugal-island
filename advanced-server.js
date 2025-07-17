@@ -17,8 +17,12 @@ app.use(express.static('public'));
 // WebSocket 서버 생성
 const wss = new WebSocket.Server({ port: 8080 });
 
-// ISS YouTube 라이브 스트림 URL
-const ISS_STREAM_URL = 'https://www.youtube.com/watch?v=fO9e9jnhYK8';
+// ISS YouTube 라이브 스트림 URL (여러 URL 시도)
+const ISS_STREAM_URLS = [
+    'https://www.youtube.com/watch?v=fO9e9jnhYK8',
+    'https://www.youtube.com/watch?v=86YLFOog4GM',
+    'https://www.youtube.com/watch?v=4jKokxPRtck'
+];
 
 // 임시 디렉토리 생성
 const tempDir = './temp';
@@ -63,78 +67,127 @@ function getAverageColor(imageData) {
     };
 }
 
-// FFmpeg를 사용한 프레임 캡처
-async function captureFrameWithFFmpeg() {
+// yt-dlp를 사용한 스트림 URL 가져오기 (개선된 버전)
+async function getStreamUrl(url) {
     return new Promise((resolve, reject) => {
-        const outputPath = `${tempDir}/frame_${Date.now()}.jpg`;
-        
-        // yt-dlp를 사용하여 스트림 URL 가져오기
         const ytdlp = spawn('yt-dlp', [
             '--get-url',
             '--format', 'worst[height<=480]',
-            ISS_STREAM_URL
+            '--no-check-certificates',
+            url
         ]);
         
         let streamUrl = '';
+        let errorOutput = '';
         
         ytdlp.stdout.on('data', (data) => {
             streamUrl += data.toString().trim();
         });
         
+        ytdlp.stderr.on('data', (data) => {
+            errorOutput += data.toString();
+        });
+        
         ytdlp.on('close', (code) => {
             if (code !== 0) {
-                console.log('yt-dlp 실패, 서버 종료');
-                reject(new Error('yt-dlp 실패'));
+                console.log(`yt-dlp 실패 (${code}): ${errorOutput}`);
+                reject(new Error(`yt-dlp 실패: ${errorOutput}`));
                 return;
             }
             
-            // FFmpeg로 프레임 캡처
-            const ffmpeg = spawn('ffmpeg', [
-                '-i', streamUrl,
-                '-vframes', '1',
-                '-q:v', '2',
-                '-y',
-                outputPath
-            ]);
-            
-            ffmpeg.on('close', async (code) => {
-                if (code !== 0) {
-                    console.log('FFmpeg 캡처 실패, 시뮬레이션 모드로 전환');
-                    resolve(getSimulatedISSSColor());
-                    return;
-                }
-                
-                try {
-                    // 캡처된 이미지 분석
-                    const image = await loadImage(outputPath);
-                    const canvas = createCanvas(image.width, image.height);
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(image, 0, 0);
-                    
-                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                    const color = getAverageColor(imageData);
-                    
-                    // 임시 파일 삭제
-                    fs.unlinkSync(outputPath);
-                    
-                    resolve(color);
-                } catch (error) {
-                    console.error('이미지 분석 오류:', error);
-                    resolve(getSimulatedISSSColor());
-                }
-            });
-            
-            ffmpeg.on('error', (error) => {
-                console.error('FFmpeg 오류:', error);
-                resolve(getSimulatedISSSColor());
-            });
+            if (streamUrl && streamUrl.startsWith('http')) {
+                resolve(streamUrl);
+            } else {
+                reject(new Error('유효하지 않은 스트림 URL'));
+            }
         });
         
         ytdlp.on('error', (error) => {
             console.error('yt-dlp 오류:', error);
-            resolve(getSimulatedISSSColor());
+            reject(error);
         });
     });
+}
+
+// FFmpeg를 사용한 프레임 캡처 (개선된 버전)
+async function captureFrameWithFFmpeg() {
+    for (let i = 0; i < ISS_STREAM_URLS.length; i++) {
+        try {
+            console.log(`ISS 스트림 ${i + 1} 시도 중: ${ISS_STREAM_URLS[i]}`);
+            
+            const streamUrl = await getStreamUrl(ISS_STREAM_URLS[i]);
+            console.log('스트림 URL 획득:', streamUrl.substring(0, 50) + '...');
+            
+            const outputPath = `${tempDir}/frame_${Date.now()}.jpg`;
+            
+            return new Promise((resolve, reject) => {
+                // FFmpeg로 프레임 캡처 (타임아웃 설정)
+                const ffmpeg = spawn('ffmpeg', [
+                    '-i', streamUrl,
+                    '-vframes', '1',
+                    '-q:v', '2',
+                    '-y',
+                    '-timeout', '10000000', // 10초 타임아웃
+                    outputPath
+                ]);
+                
+                let ffmpegError = '';
+                
+                ffmpeg.stderr.on('data', (data) => {
+                    ffmpegError += data.toString();
+                });
+                
+                ffmpeg.on('close', async (code) => {
+                    if (code !== 0) {
+                        console.log(`FFmpeg 캡처 실패 (${code}): ${ffmpegError}`);
+                        resolve(null);
+                        return;
+                    }
+                    
+                    try {
+                        // 캡처된 이미지 분석
+                        const image = await loadImage(outputPath);
+                        const canvas = createCanvas(image.width, image.height);
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(image, 0, 0);
+                        
+                        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                        const color = getAverageColor(imageData);
+                        
+                        // 임시 파일 삭제
+                        if (fs.existsSync(outputPath)) {
+                            fs.unlinkSync(outputPath);
+                        }
+                        
+                        console.log('성공적으로 색상 추출:', color);
+                        resolve(color);
+                    } catch (error) {
+                        console.error('이미지 분석 오류:', error);
+                        resolve(null);
+                    }
+                });
+                
+                ffmpeg.on('error', (error) => {
+                    console.error('FFmpeg 오류:', error);
+                    resolve(null);
+                });
+                
+                // 15초 후 타임아웃
+                setTimeout(() => {
+                    ffmpeg.kill();
+                    resolve(null);
+                }, 15000);
+            });
+            
+        } catch (error) {
+            console.log(`스트림 ${i + 1} 실패:`, error.message);
+            continue;
+        }
+    }
+    
+    // 모든 스트림이 실패한 경우
+    console.log('모든 ISS 스트림 접근 실패, 시뮬레이션 모드로 전환');
+    return null;
 }
 
 // 프레임 캡처 및 색상 분석 (고급 버전)
@@ -144,7 +197,13 @@ async function captureAndAnalyzeAdvanced() {
         
         // FFmpeg를 사용한 실제 캡처 시도
         const color = await captureFrameWithFFmpeg();
-        return color;
+        
+        if (color && (color.r > 0 || color.g > 0 || color.b > 0)) {
+            return color;
+        } else {
+            console.log('유효한 색상을 추출하지 못함, 시뮬레이션 모드로 전환');
+            return getSimulatedISSSColor();
+        }
         
     } catch (error) {
         console.error('고급 프레임 캡처 오류:', error);
@@ -201,7 +260,7 @@ setInterval(async () => {
         console.log('평균 색상:', color);
         broadcastColor(color);
     }
-}, 3000); // 3초마다 업데이트
+}, 5000); // 5초마다 업데이트 (더 긴 간격으로 변경)
 
 // API 엔드포인트
 app.get('/average-color', async (req, res) => {
@@ -212,6 +271,7 @@ app.get('/average-color', async (req, res) => {
 app.get('/status', (req, res) => {
     res.json({
         status: 'running',
+        mode: 'advanced',
         clients: wss.clients.size,
         timestamp: Date.now()
     });
@@ -223,10 +283,10 @@ app.get('/', (req, res) => {
 
 // 서버 시작
 app.listen(PORT, () => {
-    console.log(`고급 서버가 포트 ${PORT}에서 실행 중입니다.`);
+    console.log(`ISS Live Background 서버가 포트 ${PORT}에서 실행 중입니다.`);
     console.log(`웹소켓 서버가 포트 8080에서 실행 중입니다.`);
     console.log(`브라우저에서 http://localhost:${PORT}를 열어보세요.`);
-    console.log('참고: 실제 스트림 캡처를 위해서는 ffmpeg와 yt-dlp가 설치되어야 합니다.');
+    console.log('고급 모드로 실행 중입니다 (실제 ISS 스트림 캡처 시도).');
 });
 
 // WebSocket 연결 처리
