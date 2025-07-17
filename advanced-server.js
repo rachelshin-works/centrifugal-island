@@ -17,7 +17,6 @@ app.use(express.static('public'));
 // Express 서버 생성
 const server = app.listen(PORT, () => {
     console.log(`ISS Live Background 서버가 포트 ${PORT}에서 실행 중입니다.`);
-    console.log(`웹소켓 서버가 포트 ${PORT}에서 실행 중입니다.`);
     console.log('고급 모드로 실행 중입니다 (실제 ISS 스트림 캡처 시도).');
     
     // 서버 시작 시 YouTube를 먼저 열기
@@ -36,8 +35,35 @@ const server = app.listen(PORT, () => {
     }, 3000);
 });
 
-// WebSocket 서버를 Express 서버에 연결
-const wss = new WebSocket.Server({ server });
+// SSE 클라이언트들을 저장할 배열
+let sseClients = [];
+
+// SSE 엔드포인트 추가
+app.get('/color-stream', (req, res) => {
+    res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Cache-Control'
+    });
+    
+    console.log('새로운 SSE 클라이언트 연결됨');
+    sseClients.push(res);
+    
+    // 연결 즉시 현재 색상 전송
+    captureAndAnalyzeAdvanced().then(color => {
+        if (color) {
+            res.write(`data: ${JSON.stringify(color)}\n\n`);
+        }
+    });
+    
+    // 클라이언트 연결 해제 시 정리
+    req.on('close', () => {
+        console.log('SSE 클라이언트 연결 해제됨');
+        sseClients = sseClients.filter(client => client !== res);
+    });
+});
 
 // ISS YouTube 라이브 스트림 URL (더 많은 URL 추가)
 const ISS_STREAM_URLS = [
@@ -361,16 +387,10 @@ function getSimulatedISSSColor() {
     }
 }
 
-// WebSocket 클라이언트들에게 색상 전송
+// SSE 클라이언트들에게 색상 전송
 function broadcastColor(color) {
-    wss.clients.forEach(client => {
-        if (client.readyState === WebSocket.OPEN) {
-            client.send(JSON.stringify({
-                ...color,
-                timestamp: Date.now(),
-                source: 'iss-stream'
-            }));
-        }
+    sseClients.forEach(client => {
+        client.write(`data: ${JSON.stringify(color)}\n\n`);
     });
 }
 
@@ -393,7 +413,7 @@ app.get('/status', (req, res) => {
     res.json({
         status: 'running',
         mode: 'advanced',
-        clients: wss.clients.size,
+        clients: sseClients.length, // SSE 클라이언트 수 반환
         timestamp: Date.now()
     });
 });
@@ -401,53 +421,6 @@ app.get('/status', (req, res) => {
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
-
-// WebSocket 연결 처리
-wss.on('connection', (ws) => {
-    console.log('새로운 WebSocket 클라이언트 연결됨');
-    
-    // 연결 상태 추적
-    ws.isAlive = true;
-    
-    // 연결 즉시 현재 색상 전송
-    captureAndAnalyzeAdvanced().then(color => {
-        if (color) {
-            ws.send(JSON.stringify({
-                ...color,
-                timestamp: Date.now(),
-                source: 'iss-stream'
-            }));
-        }
-    });
-    
-    // 클라이언트로부터 ping 받기
-    ws.on('pong', () => {
-        ws.isAlive = true;
-    });
-    
-    ws.on('close', () => {
-        console.log('WebSocket 클라이언트 연결 해제됨');
-        ws.isAlive = false;
-    });
-    
-    ws.on('error', (error) => {
-        console.error('WebSocket 오류:', error);
-        ws.isAlive = false;
-    });
-});
-
-// WebSocket 연결 상태 확인 (30초마다)
-setInterval(() => {
-    wss.clients.forEach((ws) => {
-        if (ws.isAlive === false) {
-            console.log('비활성 WebSocket 연결 종료');
-            return ws.terminate();
-        }
-        
-        ws.isAlive = false;
-        ws.ping();
-    });
-}, 30000);
 
 // 프로세스 종료 시 정리
 process.on('SIGINT', () => {
@@ -460,6 +433,12 @@ process.on('SIGINT', () => {
         });
         fs.rmdirSync(tempDir);
     }
+    
+    // SSE 클라이언트들 정리
+    sseClients.forEach(client => {
+        client.end();
+    });
+    sseClients = [];
     
     process.exit(0);
 });
