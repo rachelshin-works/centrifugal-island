@@ -67,12 +67,12 @@
     <script>
         let currentColor = { r: 0, g: 0, b: 0 };
         let targetColor = { r: 0, g: 0, b: 0 };
-        let eventSource;
+        let ws;
         let isConnected = false;
         
         function setup() {
             createCanvas(windowWidth, windowHeight);
-            connectSSE();
+            connectWebSocket();
         }
         
         function draw() {
@@ -92,20 +92,20 @@
             resizeCanvas(windowWidth, windowHeight);
         }
         
-        function connectSSE() {
-            // Server-Sent Events 연결 (Render.com에서 WebSocket 대신 사용)
-            const sseUrl = 'https://iss-live-background.onrender.com/color-stream';
+        function connectWebSocket() {
+            // 로컬 서버에 WebSocket 연결
+            const wsUrl = 'ws://localhost:3000';
             
-            console.log('SSE 연결 시도:', sseUrl);
-            eventSource = new EventSource(sseUrl);
+            console.log('WebSocket 연결 시도:', wsUrl);
+            ws = new WebSocket(wsUrl);
             
-            eventSource.onopen = function() {
-                console.log('SSE 연결됨');
+            ws.onopen = function() {
+                console.log('WebSocket 연결됨');
                 isConnected = true;
                 updateConnectionStatus('Connected', 'green');
             };
             
-            eventSource.onmessage = function(event) {
+            ws.onmessage = function(event) {
                 try {
                     const color = JSON.parse(event.data);
                     targetColor = color;
@@ -115,12 +115,18 @@
                 }
             };
             
-            eventSource.onerror = function(error) {
-                console.error('SSE 오류:', error);
-                updateConnectionStatus('Connection Error', 'red');
+            ws.onclose = function() {
+                console.log('WebSocket 연결 해제됨');
+                isConnected = false;
+                updateConnectionStatus('Disconnected', 'red');
                 
                 // 재연결 시도
-                setTimeout(connectSSE, 3000);
+                setTimeout(connectWebSocket, 3000);
+            };
+            
+            ws.onerror = function(error) {
+                console.error('WebSocket 오류:', error);
+                updateConnectionStatus('Connection Error', 'red');
             };
         }
         

@@ -20,6 +20,7 @@ app.use(express.static('public'));
 // Express 서버 생성
 const server = app.listen(PORT, () => {
     console.log(`ISS Live Background 서버가 포트 ${PORT}에서 실행 중입니다.`);
+    console.log(`웹소켓 서버가 포트 ${PORT}에서 실행 중입니다.`);
     console.log('고급 모드로 실행 중입니다 (실제 ISS 스트림 캡처 시도).');
     
     // 서버 시작 시 YouTube를 먼저 열기
@@ -38,36 +39,8 @@ const server = app.listen(PORT, () => {
     }, 3000);
 });
 
-// SSE 클라이언트들을 저장할 배열
-let sseClients = [];
-
-// SSE 엔드포인트 추가
-app.get('/color-stream', (req, res) => {
-    res.writeHead(200, {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-        'Access-Control-Allow-Origin': 'https://centrifugal-island.onrender.com',
-        'Access-Control-Allow-Credentials': 'true',
-        'Access-Control-Allow-Headers': 'Cache-Control'
-    });
-    
-    console.log('새로운 SSE 클라이언트 연결됨');
-    sseClients.push(res);
-    
-    // 연결 즉시 현재 색상 전송
-    captureAndAnalyzeAdvanced().then(color => {
-        if (color) {
-            res.write(`data: ${JSON.stringify(color)}\n\n`);
-        }
-    });
-    
-    // 클라이언트 연결 해제 시 정리
-    req.on('close', () => {
-        console.log('SSE 클라이언트 연결 해제됨');
-        sseClients = sseClients.filter(client => client !== res);
-    });
-});
+// WebSocket 서버를 Express 서버에 연결
+const wss = new WebSocket.Server({ server });
 
 // ISS YouTube 라이브 스트림 URL (더 많은 URL 추가)
 const ISS_STREAM_URLS = [
@@ -391,19 +364,33 @@ function getSimulatedISSSColor() {
     }
 }
 
-// SSE 클라이언트들에게 색상 전송
-function broadcastColor(color) {
-    sseClients.forEach(client => {
-        client.write(`data: ${JSON.stringify(color)}\n\n`);
+// WebSocket 클라이언트에게 색상 전송
+wss.on('connection', (ws) => {
+    console.log('WebSocket 클라이언트 연결됨');
+    
+    // 연결 즉시 현재 색상 전송
+    captureAndAnalyzeAdvanced().then(color => {
+        if (color) {
+            ws.send(JSON.stringify(color));
+        }
     });
-}
+    
+    // 클라이언트 연결 해제 시 정리
+    ws.on('close', () => {
+        console.log('WebSocket 클라이언트 연결 해제됨');
+    });
+});
 
 // 주기적으로 색상 분석 및 전송
 setInterval(async () => {
     const color = await captureAndAnalyzeAdvanced();
     if (color) {
         console.log('평균 색상:', color);
-        broadcastColor(color);
+        wss.clients.forEach(client => {
+            if (client.readyState === WebSocket.OPEN) {
+                client.send(JSON.stringify(color));
+            }
+        });
     }
 }, 5000); // 5초마다 업데이트 (더 긴 간격으로 변경)
 
@@ -417,7 +404,7 @@ app.get('/status', (req, res) => {
     res.json({
         status: 'running',
         mode: 'advanced',
-        clients: sseClients.length, // SSE 클라이언트 수 반환
+        clients: wss.clients.size, // WebSocket 클라이언트 수 반환
         timestamp: Date.now()
     });
 });
@@ -438,11 +425,10 @@ process.on('SIGINT', () => {
         fs.rmdirSync(tempDir);
     }
     
-    // SSE 클라이언트들 정리
-    sseClients.forEach(client => {
-        client.end();
+    // WebSocket 클라이언트들 정리
+    wss.clients.forEach(client => {
+        client.close();
     });
-    sseClients = [];
     
     process.exit(0);
 });
