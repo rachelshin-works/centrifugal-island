@@ -2,10 +2,10 @@
   "name": "iss-live-background",
   "version": "1.0.0",
   "description": "ISS live stream pixel analysis for dynamic web background",
-  "main": "server.js",
+  "main": "advanced-server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js"
+    "start": "node advanced-server.js",
+    "dev": "nodemon advanced-server.js"
   },
   "dependencies": {
     "canvas": "^3.1.2",
