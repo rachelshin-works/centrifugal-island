@@ -11,7 +11,10 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // CORS 설정
-app.use(cors());
+app.use(cors({
+    origin: ['https://centrifugal-island.onrender.com', 'https://centrifugal-island.nyc', 'http://localhost:3000'],
+    credentials: true
+}));
 app.use(express.static('public'));
 
 // Express 서버 생성
@@ -44,7 +47,8 @@ app.get('/color-stream', (req, res) => {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': 'https://centrifugal-island.onrender.com',
+        'Access-Control-Allow-Credentials': 'true',
         'Access-Control-Allow-Headers': 'Cache-Control'
     });
     
