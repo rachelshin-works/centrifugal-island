@@ -4,7 +4,6 @@ builder = "nixpacks"
 [deploy]
 startCommand = "node advanced-server.js"
 healthcheckPath = "/status"
-healthcheckTimeout = 300
 restartPolicyType = "on_failure"
 
 [deploy.envs]
