@@ -93,28 +93,67 @@
         function getSimulatedISSColor() {
             const time = Date.now();
             const hour = new Date().getHours();
+            const minute = new Date().getMinutes();
             
-            // Time-based color changes
+            // 더 정교한 시간 기반 색상 변화
             if (hour >= 6 && hour <= 18) {
-                // Day time - Earth and space
+                // Day time - Earth and space with more variety
                 const colors = [
                     { r: 0, g: 100, b: 200 },    // Earth atmosphere (blue)
                     { r: 100, g: 150, b: 50 },   // Continents (green)
                     { r: 200, g: 200, b: 100 },  // Clouds (white)
                     { r: 255, g: 255, b: 255 },  // Sunlight reflection (white)
-                    { r: 50, g: 100, b: 150 }    // Ocean (dark blue)
+                    { r: 50, g: 100, b: 150 },   // Ocean (dark blue)
+                    { r: 150, g: 200, b: 255 },  // Sky blue
+                    { r: 80, g: 120, b: 80 },    // Forest green
+                    { r: 220, g: 220, b: 180 },  // Desert sand
+                    { r: 120, g: 180, b: 220 },  // Light blue sky
+                    { r: 180, g: 220, b: 180 }   // Light green
                 ];
-                return colors[Math.floor(time / 3000) % colors.length];
+                
+                // 시간에 따른 색상 변화 (더 부드러운 전환)
+                const timeIndex = Math.floor((hour - 6) * 60 + minute) / 72; // 12시간을 10개 색상으로 분할
+                const colorIndex = Math.floor(timeIndex) % colors.length;
+                const nextColorIndex = (colorIndex + 1) % colors.length;
+                const blend = (timeIndex % 1);
+                
+                const currentColor = colors[colorIndex];
+                const nextColor = colors[nextColorIndex];
+                
+                return {
+                    r: Math.round(currentColor.r * (1 - blend) + nextColor.r * blend),
+                    g: Math.round(currentColor.g * (1 - blend) + nextColor.g * blend),
+                    b: Math.round(currentColor.b * (1 - blend) + nextColor.b * blend)
+                };
             } else {
-                // Night time - space and city lights
+                // Night time - space and city lights with more variety
                 const colors = [
                     { r: 0, g: 0, b: 0 },        // Space (black)
                     { r: 20, g: 20, b: 40 },     // Dark space
                     { r: 50, g: 50, b: 100 },    // Night Earth (dark blue)
                     { r: 100, g: 50, b: 50 },    // City lights (red)
-                    { r: 30, g: 30, b: 60 }      // Starlight reflection
+                    { r: 30, g: 30, b: 60 },     // Starlight reflection
+                    { r: 80, g: 40, b: 80 },     // Purple night
+                    { r: 40, g: 60, b: 120 },    // Deep blue night
+                    { r: 120, g: 60, b: 40 },    // Orange city lights
+                    { r: 60, g: 40, b: 100 },    // Purple space
+                    { r: 100, g: 80, b: 40 }     // Golden hour
                 ];
-                return colors[Math.floor(time / 4000) % colors.length];
+                
+                // 밤 시간대 색상 변화
+                const timeIndex = Math.floor((hour + 6) * 60 + minute) / 72; // 12시간을 10개 색상으로 분할
+                const colorIndex = Math.floor(timeIndex) % colors.length;
+                const nextColorIndex = (colorIndex + 1) % colors.length;
+                const blend = (timeIndex % 1);
+                
+                const currentColor = colors[colorIndex];
+                const nextColor = colors[nextColorIndex];
+                
+                return {
+                    r: Math.round(currentColor.r * (1 - blend) + nextColor.r * blend),
+                    g: Math.round(currentColor.g * (1 - blend) + nextColor.g * blend),
+                    b: Math.round(currentColor.b * (1 - blend) + nextColor.b * blend)
+                };
             }
         }
         

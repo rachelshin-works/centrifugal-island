@@ -17,11 +17,16 @@ app.use(express.static('public'));
 // WebSocket 서버 생성
 const wss = new WebSocket.Server({ port: 8080 });
 
-// ISS YouTube 라이브 스트림 URL (여러 URL 시도)
+// ISS YouTube 라이브 스트림 URL (더 많은 URL 추가)
 const ISS_STREAM_URLS = [
-    'https://www.youtube.com/watch?v=fO9e9jnhYK8',
-    'https://www.youtube.com/watch?v=86YLFOog4GM',
-    'https://www.youtube.com/watch?v=4jKokxPRtck'
+    'https://www.youtube.com/watch?v=fO9e9jnhYK8',  // ISS Live: Earth from Space
+    'https://www.youtube.com/watch?v=86YLFOog4GM',  // ISS Live: NASA Earth Views
+    'https://www.youtube.com/watch?v=4jKokxPRtck',  // ISS Live: Space Station
+    'https://www.youtube.com/watch?v=UdnTZO_c-TY',  // ISS Live: International Space Station
+    'https://www.youtube.com/watch?v=21X5lGlDOfg',  // NASA Live: Earth from Space
+    'https://www.youtube.com/watch?v=qtl0WxQqJqE',  // ISS Live: Space Station Cam
+    'https://www.youtube.com/watch?v=EEIk7gwjgIM',  // ISS Live: Earth Views
+    'https://www.youtube.com/watch?v=1-fVoQKqKNE'   // ISS Live: Space Station Live
 ];
 
 // 임시 디렉토리 생성
@@ -200,31 +205,90 @@ async function captureAndAnalyzeAdvanced() {
     try {
         console.log('ISS 스트림에서 프레임 캡처 중...');
         
-        // FFmpeg를 사용한 실제 캡처 시도
-        const color = await captureFrameWithFFmpeg();
-        
-        // 색상 유효성 검사를 더 관대하게 수정
-        if (color && (color.r >= 0 && color.g >= 0 && color.b >= 0)) {
-            // 검은색이 아닌 경우에만 반환 (임계값을 더 낮게 설정)
-            if (color.r > 1 || color.g > 1 || color.b > 1) {
-                console.log('실제 색상 추출 성공:', color);
-                return color;
-            } else {
-                console.log('검은색 프레임 감지, 다른 스트림 시도');
-                // 다른 스트림 URL 시도
-                for (let i = 1; i < ISS_STREAM_URLS.length; i++) {
-                    try {
-                        console.log(`대체 스트림 ${i + 1} 시도 중: ${ISS_STREAM_URLS[i]}`);
-                        const altColor = await captureFrameWithFFmpeg();
-                        if (altColor && (altColor.r > 1 || altColor.g > 1 || altColor.b > 1)) {
-                            console.log('대체 스트림에서 색상 추출 성공:', altColor);
-                            return altColor;
+        // 모든 스트림 URL을 시도
+        for (let i = 0; i < ISS_STREAM_URLS.length; i++) {
+            try {
+                console.log(`ISS 스트림 ${i + 1} 시도 중: ${ISS_STREAM_URLS[i]}`);
+                
+                const streamUrl = await getStreamUrl(ISS_STREAM_URLS[i]);
+                console.log('스트림 URL 획득:', streamUrl.substring(0, 50) + '...');
+                
+                const outputPath = `${tempDir}/frame_${Date.now()}.jpg`;
+                
+                const color = await new Promise((resolve, reject) => {
+                    const ffmpeg = spawn('ffmpeg', [
+                        '-i', streamUrl,
+                        '-vframes', '1',
+                        '-q:v', '1',
+                        '-y',
+                        '-avoid_negative_ts', 'make_zero',
+                        '-fflags', '+genpts',
+                        '-r', '1',
+                        outputPath
+                    ]);
+                    
+                    let ffmpegError = '';
+                    
+                    ffmpeg.stderr.on('data', (data) => {
+                        ffmpegError += data.toString();
+                    });
+                    
+                    ffmpeg.on('close', async (code) => {
+                        if (code !== 0) {
+                            console.log(`FFmpeg 캡처 실패 (${code}): ${ffmpegError}`);
+                            resolve(null);
+                            return;
                         }
-                    } catch (error) {
-                        console.log(`대체 스트림 ${i + 1} 실패:`, error.message);
+                        
+                        try {
+                            const image = await loadImage(outputPath);
+                            const canvas = createCanvas(image.width, image.height);
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(image, 0, 0);
+                            
+                            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                            const color = getAverageColor(imageData);
+                            
+                            // 임시 파일 삭제
+                            if (fs.existsSync(outputPath)) {
+                                fs.unlinkSync(outputPath);
+                            }
+                            
+                            console.log('성공적으로 색상 추출:', color);
+                            resolve(color);
+                        } catch (error) {
+                            console.error('이미지 분석 오류:', error);
+                            resolve(null);
+                        }
+                    });
+                    
+                    ffmpeg.on('error', (error) => {
+                        console.error('FFmpeg 오류:', error);
+                        resolve(null);
+                    });
+                    
+                    // 15초 후 타임아웃
+                    setTimeout(() => {
+                        ffmpeg.kill();
+                        resolve(null);
+                    }, 15000);
+                });
+                
+                // 색상 유효성 검사 (더 관대한 조건)
+                if (color && (color.r >= 0 && color.g >= 0 && color.b >= 0)) {
+                    // 검은색이 아닌 경우 (임계값을 더 낮게 설정)
+                    if (color.r > 5 || color.g > 5 || color.b > 5) {
+                        console.log('실제 색상 추출 성공:', color);
+                        return color;
+                    } else {
+                        console.log('검은색 프레임 감지, 다른 스트림 시도');
                         continue;
                     }
                 }
+                
+            } catch (error) {
+                console.log(`스트림 ${i + 1} 실패:`, error.message);
+                continue;
             }
         }
         
@@ -362,4 +426,4 @@ process.on('SIGINT', () => {
     }
     
     process.exit(0);
-}); 
+});
