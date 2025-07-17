@@ -2,9 +2,19 @@ services:
   - type: web
     name: iss-live-background
     env: node
-    buildCommand: npm install
+    buildCommand: |
+      # 시스템 패키지 업데이트 및 FFmpeg 설치
+      apt-get update && apt-get install -y ffmpeg python3-pip
+      # yt-dlp 설치
+      pip3 install yt-dlp
+      # Node.js 의존성 설치
+      npm install
     startCommand: node advanced-server.js
     envVars:
       - key: NODE_ENV
         value: production
-    plan: free 
+      - key: PORT
+        value: 10000
+    plan: free
+    healthCheckPath: /status
+    autoDeploy: true 
