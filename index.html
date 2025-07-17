@@ -90,7 +90,7 @@
         function tryConnectServer() {
             // 1. WebSocket 우선 시도
             let wsProtocol = (location.protocol === 'https:') ? 'wss' : 'ws';
-            let wsUrl = wsProtocol + '://' + location.host;
+            let wsUrl = wsProtocol + '://' + location.host + '/ws';
             ws = new WebSocket(wsUrl);
             ws.onopen = function() {
                 serverConnected = true;

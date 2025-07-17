@@ -46,7 +46,7 @@ const server = app.listen(PORT, HOST, () => {
 });
 
 // WebSocket 서버를 Express 서버에 연결
-const wss = new WebSocket.Server({ server });
+const wss = new WebSocket.Server({ server, path: '/ws' });
 
 // ISS YouTube 라이브 스트림 URL (더 많은 URL 추가)
 const ISS_STREAM_URLS = [
