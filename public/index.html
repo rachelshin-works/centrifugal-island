@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ISS Live Background</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: 'Arial', sans-serif;
+        }
+        
+        #info {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 10px;
+            z-index: 1000;
+            font-size: 14px;
+        }
+        
+        #status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 10px;
+            z-index: 1000;
+            font-size: 14px;
+        }
+        
+        .color-box {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid white;
+            margin-left: 10px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <h3>ISS Live Background</h3>
+        <p>Real-time Color: <span id="current-color">Waiting...</span><span id="color-display" class="color-box"></span></p>
+        <p>Connection Status: <span id="connection-status">Connecting...</span></p>
+    </div>
+    
+    <div id="status">
+        <p>Update Interval: 2 seconds</p>
+        <p>Last Update: <span id="last-update">-</span></p>
+    </div>
+
+    <script>
+        let currentColor = { r: 0, g: 0, b: 0 };
+        let targetColor = { r: 0, g: 0, b: 0 };
+        let ws;
+        let isConnected = false;
+        
+        function setup() {
+            createCanvas(windowWidth, windowHeight);
+            connectWebSocket();
+        }
+        
+        function draw() {
+            // 부드러운 색상 전환
+            currentColor.r = lerp(currentColor.r, targetColor.r, 0.05);
+            currentColor.g = lerp(currentColor.g, targetColor.g, 0.05);
+            currentColor.b = lerp(currentColor.b, targetColor.b, 0.05);
+            
+            // 배경 그리기
+            background(currentColor.r, currentColor.g, currentColor.b);
+            
+            // UI 업데이트
+            updateUI();
+        }
+        
+        function windowResized() {
+            resizeCanvas(windowWidth, windowHeight);
+        }
+        
+        function connectWebSocket() {
+            ws = new WebSocket('ws://localhost:8080');
+            
+            ws.onopen = function() {
+                console.log('WebSocket 연결됨');
+                isConnected = true;
+                updateConnectionStatus('Connected', 'green');
+            };
+            
+            ws.onmessage = function(event) {
+                try {
+                    const color = JSON.parse(event.data);
+                    targetColor = color;
+                    updateLastUpdate();
+                } catch (error) {
+                    console.error('색상 데이터 파싱 오류:', error);
+                }
+            };
+            
+            ws.onclose = function() {
+                console.log('WebSocket 연결 해제됨');
+                isConnected = false;
+                updateConnectionStatus('Disconnected', 'red');
+                
+                // 재연결 시도
+                setTimeout(connectWebSocket, 3000);
+            };
+            
+            ws.onerror = function(error) {
+                console.error('WebSocket 오류:', error);
+                updateConnectionStatus('Connection Error', 'red');
+            };
+        }
+        
+        function updateUI() {
+            const colorText = `RGB(${Math.round(currentColor.r)}, ${Math.round(currentColor.g)}, ${Math.round(currentColor.b)})`;
+            document.getElementById('current-color').textContent = colorText;
+            
+            const colorDisplay = document.getElementById('color-display');
+            colorDisplay.style.backgroundColor = `rgb(${Math.round(currentColor.r)}, ${Math.round(currentColor.g)}, ${Math.round(currentColor.b)})`;
+        }
+        
+        function updateConnectionStatus(status, color) {
+            const statusElement = document.getElementById('connection-status');
+            statusElement.textContent = status;
+            statusElement.style.color = color;
+        }
+        
+        function updateLastUpdate() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString();
+            document.getElementById('last-update').textContent = timeString;
+        }
+    </script>
+</body>
+</html> 
