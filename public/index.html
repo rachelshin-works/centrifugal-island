@@ -93,14 +93,7 @@
         }
         
         function connectWebSocket() {
-            // 동적으로 WebSocket URL 생성
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const host = window.location.hostname;
-            const port = window.location.port || (protocol === 'wss:' ? '443' : '80');
-            const wsUrl = `${protocol}//${host}:${port}`;
-            
-            console.log('WebSocket 연결 시도:', wsUrl);
-            ws = new WebSocket(wsUrl);
+            ws = new WebSocket('ws://localhost:8080');
             
             ws.onopen = function() {
                 console.log('WebSocket 연결됨');

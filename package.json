@@ -4,9 +4,8 @@
   "description": "ISS live stream pixel analysis for dynamic web background",
   "main": "server.js",
   "scripts": {
-    "start": "node advanced-server.js",
-    "dev": "nodemon advanced-server.js",
-    "basic": "node server.js"
+    "start": "node server.js",
+    "dev": "nodemon server.js"
   },
   "dependencies": {
     "canvas": "^3.1.2",
