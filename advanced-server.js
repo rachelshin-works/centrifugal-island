@@ -6,37 +6,55 @@ const { createCanvas, loadImage } = require('canvas');
 const WebSocket = require('ws');
 const path = require('path');
 const fs = require('fs');
+const config = require('./config');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = config.port;
+const HOST = config.host;
 
-// CORS 설정
+// CORS 설정 - 모든 도메인 허용 (개발/배포 환경 모두 지원)
 app.use(cors({
-    origin: ['https://centrifugal-island.onrender.com', 'https://centrifugal-island.nyc', 'http://localhost:3000'],
+    origin: function (origin, callback) {
+        // 개발 환경에서는 모든 origin 허용
+        if (!origin || config.nodeEnv === 'development') {
+            return callback(null, true);
+        }
+        
+        // 배포 환경에서는 설정된 도메인만 허용
+        if (config.allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('CORS policy violation'));
+        }
+    },
     credentials: true
 }));
+
 app.use(express.static('public'));
 
-// Express 서버 생성
-const server = app.listen(PORT, () => {
-    console.log(`ISS Live Background 서버가 포트 ${PORT}에서 실행 중입니다.`);
-    console.log(`웹소켓 서버가 포트 ${PORT}에서 실행 중입니다.`);
+// Express 서버 생성 - 모든 인터페이스에서 접근 가능
+const server = app.listen(PORT, HOST, () => {
+    console.log(`ISS Live Background 서버가 ${HOST}:${PORT}에서 실행 중입니다.`);
+    console.log(`웹소켓 서버가 ${HOST}:${PORT}에서 실행 중입니다.`);
+    console.log(`환경: ${config.nodeEnv}`);
     console.log('고급 모드로 실행 중입니다 (실제 ISS 스트림 캡처 시도).');
     
-    // 서버 시작 시 YouTube를 먼저 열기
-    const { exec } = require('child_process');
-    exec('open https://www.youtube.com/watch?v=fO9e9jnhYK8', (error) => {
-        if (error) {
-            console.log('YouTube 자동 열기 실패:', error.message);
-        } else {
-            console.log('YouTube ISS 스트림이 새 탭에서 열렸습니다.');
-        }
-    });
-    
-    // 3초 후 웹페이지 안내
-    setTimeout(() => {
-        console.log(`이제 브라우저에서 http://localhost:${PORT}를 열어보세요.`);
-    }, 3000);
+    // 서버 시작 시 YouTube를 먼저 열기 (개발 환경에서만)
+    if (config.nodeEnv === 'development') {
+        const { exec } = require('child_process');
+        exec('open https://www.youtube.com/watch?v=fO9e9jnhYK8', (error) => {
+            if (error) {
+                console.log('YouTube 자동 열기 실패:', error.message);
+            } else {
+                console.log('YouTube ISS 스트림이 새 탭에서 열렸습니다.');
+            }
+        });
+        
+        // 3초 후 웹페이지 안내
+        setTimeout(() => {
+            console.log(`이제 브라우저에서 http://localhost:${PORT}를 열어보세요.`);
+        }, 3000);
+    }
 });
 
 // WebSocket 서버를 Express 서버에 연결
@@ -301,11 +319,11 @@ async function captureAndAnalyzeAdvanced() {
                         resolve(null);
                     });
                     
-                    // 15초 후 타임아웃
+                    // 설정된 시간 후 타임아웃 (더 긴 시간)
                     setTimeout(() => {
                         ffmpeg.kill();
                         resolve(null);
-                    }, 15000);
+                    }, config.issTimeout);
                 });
                 
                 // 색상 유효성 검사 (더 관대한 조건)
@@ -365,8 +383,8 @@ function getSimulatedISSSColor() {
 }
 
 // WebSocket 클라이언트에게 색상 전송
-wss.on('connection', (ws) => {
-    console.log('WebSocket 클라이언트 연결됨');
+wss.on('connection', (ws, req) => {
+    console.log('WebSocket 클라이언트 연결됨:', req.headers.origin || 'unknown origin');
     
     // 연결 즉시 현재 색상 전송
     captureAndAnalyzeAdvanced().then(color => {
@@ -379,6 +397,16 @@ wss.on('connection', (ws) => {
     ws.on('close', () => {
         console.log('WebSocket 클라이언트 연결 해제됨');
     });
+    
+    // 에러 처리
+    ws.on('error', (error) => {
+        console.error('WebSocket 클라이언트 오류:', error);
+    });
+});
+
+// WebSocket 서버 에러 처리
+wss.on('error', (error) => {
+    console.error('WebSocket 서버 오류:', error);
 });
 
 // 주기적으로 색상 분석 및 전송
@@ -392,7 +420,7 @@ setInterval(async () => {
             }
         });
     }
-}, 5000); // 5초마다 업데이트 (더 긴 간격으로 변경)
+}, config.issUpdateInterval); // 설정된 간격으로 업데이트
 
 // API 엔드포인트
 app.get('/average-color', async (req, res) => {

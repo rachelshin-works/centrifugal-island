@@ -9,12 +9,28 @@ services:
       pip3 install yt-dlp
       # Node.js 의존성 설치
       npm install
-    startCommand: node advanced-server.js
+    startCommand: npm run prod
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 10000
+      - key: HOST
+        value: 0.0.0.0
+      - key: ALLOWED_ORIGINS
+        value: https://centrifugal-island.nyc,https://www.centrifugal-island.nyc
+      - key: ISS_UPDATE_INTERVAL
+        value: 5000
+      - key: ISS_TIMEOUT
+        value: 20000
     plan: free
     healthCheckPath: /status
-    autoDeploy: true 
+    autoDeploy: true
+    # WebSocket 지원을 위한 설정
+    headers:
+      - path: /*
+        name: Upgrade
+        value: websocket
+      - path: /*
+        name: Connection
+        value: Upgrade 

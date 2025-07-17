@@ -69,10 +69,16 @@
         let targetColor = { r: 0, g: 0, b: 0 };
         let ws;
         let isConnected = false;
+        let pollingInterval;
         
         function setup() {
             createCanvas(windowWidth, windowHeight);
+            
+            // WebSocket 연결 시도
             connectWebSocket();
+            
+            // 초기 시뮬레이션 색상 설정 (WebSocket 연결 실패 시 대비)
+            targetColor = getSimulatedISSColor();
         }
         
         function draw() {
@@ -93,16 +99,36 @@
         }
         
         function connectWebSocket() {
-            // 로컬 서버에 WebSocket 연결
-            const wsUrl = 'ws://localhost:3000';
+            // Render.com 배포 환경에서 WebSocket 연결
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const host = window.location.hostname;
+            const port = window.location.port || (protocol === 'wss:' ? '443' : '80');
+            const wsUrl = `${protocol}//${host}:${port}`;
             
             console.log('WebSocket 연결 시도:', wsUrl);
             ws = new WebSocket(wsUrl);
             
+            // 연결 타임아웃 설정
+            const connectionTimeout = setTimeout(() => {
+                if (ws.readyState === WebSocket.CONNECTING) {
+                    console.log('WebSocket 연결 타임아웃, HTTP 폴링으로 전환');
+                    ws.close();
+                    updateConnectionStatus('HTTP Polling Mode', 'blue');
+                    startHttpPolling();
+                }
+            }, 5000);
+            
             ws.onopen = function() {
                 console.log('WebSocket 연결됨');
+                clearTimeout(connectionTimeout);
                 isConnected = true;
-                updateConnectionStatus('Connected', 'green');
+                updateConnectionStatus('Connected (WebSocket)', 'green');
+                
+                // HTTP 폴링 중지
+                if (pollingInterval) {
+                    clearInterval(pollingInterval);
+                    pollingInterval = null;
+                }
             };
             
             ws.onmessage = function(event) {
@@ -117,17 +143,136 @@
             
             ws.onclose = function() {
                 console.log('WebSocket 연결 해제됨');
+                clearTimeout(connectionTimeout);
                 isConnected = false;
-                updateConnectionStatus('Disconnected', 'red');
+                updateConnectionStatus('HTTP Polling Mode', 'blue');
                 
-                // 재연결 시도
-                setTimeout(connectWebSocket, 3000);
+                // HTTP 폴링으로 전환
+                startHttpPolling();
+                
+                // 재연결 시도 (더 긴 간격)
+                setTimeout(connectWebSocket, 15000);
             };
             
             ws.onerror = function(error) {
                 console.error('WebSocket 오류:', error);
-                updateConnectionStatus('Connection Error', 'red');
+                clearTimeout(connectionTimeout);
+                updateConnectionStatus('HTTP Polling Mode', 'blue');
+                
+                // HTTP 폴링으로 전환
+                startHttpPolling();
             };
+        }
+        
+        // HTTP 폴링으로 색상 업데이트 (WebSocket 대안)
+        function startHttpPolling() {
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+            }
+            
+            // 즉시 첫 번째 요청
+            fetchColorData();
+            
+            // 5초마다 색상 데이터 요청
+            pollingInterval = setInterval(fetchColorData, 5000);
+        }
+        
+        async function fetchColorData() {
+            try {
+                const response = await fetch('/average-color');
+                if (response.ok) {
+                    const color = await response.json();
+                    targetColor = color;
+                    updateLastUpdate();
+                } else {
+                    console.log('HTTP 요청 실패, 시뮬레이션 모드로 전환');
+                    updateConnectionStatus('Simulation Mode', 'orange');
+                    startSimulation();
+                }
+            } catch (error) {
+                console.error('HTTP 요청 오류:', error);
+                updateConnectionStatus('Simulation Mode', 'orange');
+                startSimulation();
+            }
+        }
+        
+        // ISS 색상 시뮬레이션 (fallback용)
+        function getSimulatedISSColor() {
+            const time = Date.now();
+            const hour = new Date().getHours();
+            const minute = new Date().getMinutes();
+            
+            // 더 정교한 시간 기반 색상 변화
+            if (hour >= 6 && hour <= 18) {
+                // Day time - Earth and space with more variety
+                const colors = [
+                    { r: 0, g: 100, b: 200 },    // Earth atmosphere (blue)
+                    { r: 100, g: 150, b: 50 },   // Continents (green)
+                    { r: 200, g: 200, b: 100 },  // Clouds (white)
+                    { r: 255, g: 255, b: 255 },  // Sunlight reflection (white)
+                    { r: 50, g: 100, b: 150 },   // Ocean (dark blue)
+                    { r: 150, g: 200, b: 255 },  // Sky blue
+                    { r: 80, g: 120, b: 80 },    // Forest green
+                    { r: 220, g: 220, b: 180 },  // Desert sand
+                    { r: 120, g: 180, b: 220 },  // Light blue sky
+                    { r: 180, g: 220, b: 180 }   // Light green
+                ];
+                
+                // 시간에 따른 색상 변화 (더 부드러운 전환)
+                const timeIndex = Math.floor((hour - 6) * 60 + minute) / 72; // 12시간을 10개 색상으로 분할
+                const colorIndex = Math.floor(timeIndex) % colors.length;
+                const nextColorIndex = (colorIndex + 1) % colors.length;
+                const blend = (timeIndex % 1);
+                
+                const currentColor = colors[colorIndex];
+                const nextColor = colors[nextColorIndex];
+                
+                return {
+                    r: Math.round(currentColor.r * (1 - blend) + nextColor.r * blend),
+                    g: Math.round(currentColor.g * (1 - blend) + nextColor.g * blend),
+                    b: Math.round(currentColor.b * (1 - blend) + nextColor.b * blend)
+                };
+            } else {
+                // Night time - space and city lights with more variety
+                const colors = [
+                    { r: 0, g: 0, b: 0 },        // Space (black)
+                    { r: 20, g: 20, b: 40 },     // Dark space
+                    { r: 50, g: 50, b: 100 },    // Night Earth (dark blue)
+                    { r: 100, g: 50, b: 50 },    // City lights (red)
+                    { r: 30, g: 30, b: 60 },     // Starlight reflection
+                    { r: 80, g: 40, b: 80 },     // Purple night
+                    { r: 40, g: 60, b: 120 },    // Deep blue night
+                    { r: 120, g: 60, b: 40 },    // Orange city lights
+                    { r: 60, g: 40, b: 100 },    // Purple space
+                    { r: 100, g: 80, b: 40 }     // Golden hour
+                ];
+                
+                // 밤 시간대 색상 변화
+                const timeIndex = Math.floor((hour + 6) * 60 + minute) / 72; // 12시간을 10개 색상으로 분할
+                const colorIndex = Math.floor(timeIndex) % colors.length;
+                const nextColorIndex = (colorIndex + 1) % colors.length;
+                const blend = (timeIndex % 1);
+                
+                const currentColor = colors[colorIndex];
+                const nextColor = colors[nextColorIndex];
+                
+                return {
+                    r: Math.round(currentColor.r * (1 - blend) + nextColor.r * blend),
+                    g: Math.round(currentColor.g * (1 - blend) + nextColor.g * blend),
+                    b: Math.round(currentColor.b * (1 - blend) + nextColor.b * blend)
+                };
+            }
+        }
+        
+        function startSimulation() {
+            // Update color every 3 seconds
+            setInterval(() => {
+                targetColor = getSimulatedISSColor();
+                updateLastUpdate();
+            }, 3000);
+            
+            // Initial color
+            targetColor = getSimulatedISSColor();
         }
         
         // 색상 밝기 계산 함수
