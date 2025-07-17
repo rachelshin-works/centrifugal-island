@@ -21,8 +21,9 @@ const wss = new WebSocket.Server({ server });
 // ISS YouTube 라이브 스트림 URL
 const ISS_STREAM_URL = 'https://www.youtube.com/watch?v=fO9e9jnhYK8';
 
-// 미묘한 톤의 색상 팔레트 (보라색 제거)
+// 미묘한 톤의 색상 팔레트 (보라색 제거, 블랙 추가)
 const subtleColors = [
+    { r: 0, g: 0, b: 0 },        // 블랙
     { r: 120, g: 120, b: 125 },  // 미묘한 회색톤
     { r: 140, g: 160, b: 180 },  // 하늘색 톤
     { r: 100, g: 130, b: 150 },  // 바다톤
@@ -33,7 +34,7 @@ const subtleColors = [
     { r: 140, g: 130, b: 110 }   // 모래톤
 ];
 
-let currentColorIndex = 0;
+let currentColorIndex = Math.floor(Math.random() * subtleColors.length);
 let colorChangeTime = Date.now();
 const COLOR_DURATION = 180000; // 3분 (밀리초)
 
