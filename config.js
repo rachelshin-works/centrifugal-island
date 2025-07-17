@@ -7,17 +7,20 @@ const config = {
     host: process.env.HOST || '0.0.0.0',
     nodeEnv: process.env.NODE_ENV || 'development',
     
-    // CORS 설정
+    // CORS 설정 - 모든 도메인 허용 (배포 환경 대응)
     allowedOrigins: process.env.ALLOWED_ORIGINS 
         ? process.env.ALLOWED_ORIGINS.split(',') 
         : [
+            '*', // 모든 도메인 허용 (배포 환경에서 필요)
             'https://centrifugal-island.onrender.com',
             'https://centrifugal-island.nyc',
             'https://www.centrifugal-island.nyc',
             'http://localhost:3000',
             'http://localhost:8080',
             'http://127.0.0.1:3000',
-            'http://127.0.0.1:8080'
+            'http://127.0.0.1:8080',
+            'https://localhost:3000',
+            'https://127.0.0.1:3000'
         ],
     
     // WebSocket 설정

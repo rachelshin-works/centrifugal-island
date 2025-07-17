@@ -6,62 +6,43 @@ const { createCanvas, loadImage } = require('canvas');
 const WebSocket = require('ws');
 const path = require('path');
 const fs = require('fs');
-const config = require('./config');
 
 const app = express();
-const PORT = config.port;
-const HOST = config.host;
+const PORT = process.env.PORT || 3000;
 
-// CORS 설정 - 모든 도메인 허용 (개발/배포 환경 모두 지원)
-app.use(cors({
-    origin: '*',
-    credentials: true
-}));
-
+// CORS 설정
+app.use(cors());
 app.use(express.static('public'));
 
-// Express 서버 생성 - 모든 인터페이스에서 접근 가능
-const server = app.listen(PORT, HOST, () => {
-    console.log(`ISS Live Background 서버가 ${HOST}:${PORT}에서 실행 중입니다.`);
-    console.log(`웹소켓 서버가 ${HOST}:${PORT}에서 실행 중입니다.`);
-    console.log(`환경: ${config.nodeEnv}`);
+// Express 서버 생성
+const server = app.listen(PORT, () => {
+    console.log(`ISS Live Background 서버가 포트 ${PORT}에서 실행 중입니다.`);
     console.log('고급 모드로 실행 중입니다 (실제 ISS 스트림 캡처 시도).');
     
-    // 서버 시작 시 YouTube를 먼저 열기 (개발 환경에서만)
-    if (config.nodeEnv === 'development') {
-        const { exec } = require('child_process');
-        exec('open https://www.youtube.com/watch?v=fO9e9jnhYK8', (error) => {
-            if (error) {
-                console.log('YouTube 자동 열기 실패:', error.message);
-            } else {
-                console.log('YouTube ISS 스트림이 새 탭에서 열렸습니다.');
-            }
-        });
-        
-        // 3초 후 웹페이지 안내
-        setTimeout(() => {
-            console.log(`이제 브라우저에서 http://localhost:${PORT}를 열어보세요.`);
-        }, 3000);
-    }
+    // 서버 시작 시 YouTube를 먼저 열기
+    const { exec } = require('child_process');
+    exec('open https://www.youtube.com/watch?v=fO9e9jnhYK8', (error) => {
+        if (error) {
+            console.log('YouTube 자동 열기 실패:', error.message);
+        } else {
+            console.log('YouTube ISS 스트림이 새 탭에서 열렸습니다.');
+        }
+    });
+    
+    // 3초 후 웹페이지 안내
+    setTimeout(() => {
+        console.log(`이제 브라우저에서 http://localhost:${PORT}를 열어보세요.`);
+    }, 3000);
 });
 
-// WebSocket 서버를 Express 서버에 연결
-const wss = new WebSocket.Server({ server, path: '/ws' });
+// WebSocket 서버를 Express 서버와 같은 포트에서 실행
+const wss = new WebSocket.Server({ server });
 
-// ISS YouTube 라이브 스트림 URL (더 많은 URL 추가)
+// ISS YouTube 라이브 스트림 URL (핵심 URL만)
 const ISS_STREAM_URLS = [
     'https://www.youtube.com/watch?v=fO9e9jnhYK8',  // ISS Live: Earth from Space
     'https://www.youtube.com/watch?v=86YLFOog4GM',  // ISS Live: NASA Earth Views
-    'https://www.youtube.com/watch?v=4jKokxPRtck',  // ISS Live: Space Station
-    'https://www.youtube.com/watch?v=UdnTZO_c-TY',  // ISS Live: International Space Station
-    'https://www.youtube.com/watch?v=21X5lGlDOfg',  // NASA Live: Earth from Space
-    'https://www.youtube.com/watch?v=qtl0WxQqJqE',  // ISS Live: Space Station Cam
-    'https://www.youtube.com/watch?v=EEIk7gwjgIM',  // ISS Live: Earth Views
-    'https://www.youtube.com/watch?v=1-fVoQKqKNE',  // ISS Live: Space Station Live
-    'https://www.youtube.com/watch?v=6AviDjR9mmo',  // ISS Live: Space Station
-    'https://www.youtube.com/watch?v=86YLFOog4GM',  // NASA Live: Earth from Space
-    'https://www.youtube.com/watch?v=4jKokxPRtck',  // ISS Live: Space Station
-    'https://www.youtube.com/watch?v=UdnTZO_c-TY'   // ISS Live: International Space Station
+    'https://www.youtube.com/watch?v=4jKokxPRtck'   // ISS Live: Space Station
 ];
 
 // 임시 디렉토리 생성
@@ -307,17 +288,17 @@ async function captureAndAnalyzeAdvanced() {
                         resolve(null);
                     });
                     
-                    // 설정된 시간 후 타임아웃 (더 긴 시간)
+                    // 15초 후 타임아웃
                     setTimeout(() => {
                         ffmpeg.kill();
                         resolve(null);
-                    }, config.issTimeout);
+                    }, 15000);
                 });
                 
                 // 색상 유효성 검사 (더 관대한 조건)
                 if (color && (color.r >= 0 && color.g >= 0 && color.b >= 0)) {
                     // 검은색이 아닌 경우 (임계값을 더 낮게 설정)
-                    if (color.r > 1 || color.g > 1 || color.b > 1) {
+                    if (color.r > 5 || color.g > 5 || color.b > 5) {
                         console.log('실제 색상 추출 성공:', color);
                         return color;
                     } else {
@@ -370,73 +351,17 @@ function getSimulatedISSSColor() {
     }
 }
 
-// WebSocket 클라이언트에게 색상 전송
-wss.on('connection', (ws, req) => {
-    console.log('WebSocket 클라이언트 연결됨:', req.headers.origin || 'unknown origin');
-    
-    // 연결 즉시 현재 색상 전송
-    captureAndAnalyzeAdvanced().then(color => {
-        if (color) {
-            ws.send(JSON.stringify(color));
+// WebSocket 클라이언트들에게 색상 전송
+function broadcastColor(color) {
+    wss.clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(JSON.stringify({
+                ...color,
+                timestamp: Date.now(),
+                source: 'iss-stream'
+            }));
         }
     });
-    
-    // 클라이언트 연결 해제 시 정리
-    ws.on('close', () => {
-        console.log('WebSocket 클라이언트 연결 해제됨');
-    });
-    
-    // 에러 처리
-    ws.on('error', (error) => {
-        console.error('WebSocket 클라이언트 오류:', error);
-    });
-});
-
-// WebSocket 서버 에러 처리
-wss.on('error', (error) => {
-    console.error('WebSocket 서버 오류:', error);
-});
-
-// Server-Sent Events 엔드포인트 (WebSocket 대안)
-app.get('/events', (req, res) => {
-    res.writeHead(200, {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Cache-Control'
-    });
-
-    // 클라이언트에게 연결 확인
-    res.write('data: {"type": "connected"}\n\n');
-
-    // 클라이언트를 SSE 클라이언트 목록에 추가
-    const clientId = Date.now();
-    const client = { id: clientId, res: res };
-    
-    if (!app.sseClients) {
-        app.sseClients = new Map();
-    }
-    app.sseClients.set(clientId, client);
-
-    // 클라이언트 연결 해제 시 정리
-    req.on('close', () => {
-        app.sseClients.delete(clientId);
-    });
-});
-
-// SSE 클라이언트들에게 색상 전송
-function sendToSSEClients(color) {
-    if (app.sseClients) {
-        app.sseClients.forEach((client, id) => {
-            try {
-                client.res.write(`data: ${JSON.stringify(color)}\n\n`);
-            } catch (error) {
-                console.error('SSE 클라이언트 전송 오류:', error);
-                app.sseClients.delete(id);
-            }
-        });
-    }
 }
 
 // 주기적으로 색상 분석 및 전송
@@ -444,18 +369,9 @@ setInterval(async () => {
     const color = await captureAndAnalyzeAdvanced();
     if (color) {
         console.log('평균 색상:', color);
-        
-        // WebSocket 클라이언트들에게 전송
-        wss.clients.forEach(client => {
-            if (client.readyState === WebSocket.OPEN) {
-                client.send(JSON.stringify(color));
-            }
-        });
-        
-        // SSE 클라이언트들에게도 전송
-        sendToSSEClients(color);
+        broadcastColor(color);
     }
-}, config.issUpdateInterval); // 설정된 간격으로 업데이트
+}, 5000); // 5초마다 업데이트 (더 긴 간격으로 변경)
 
 // API 엔드포인트
 app.get('/average-color', async (req, res) => {
@@ -467,13 +383,33 @@ app.get('/status', (req, res) => {
     res.json({
         status: 'running',
         mode: 'advanced',
-        clients: wss.clients.size, // WebSocket 클라이언트 수 반환
+        clients: wss.clients.size,
         timestamp: Date.now()
     });
 });
 
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// WebSocket 연결 처리
+wss.on('connection', (ws) => {
+    console.log('새로운 WebSocket 클라이언트 연결됨');
+    
+    // 연결 즉시 현재 색상 전송
+    captureAndAnalyzeAdvanced().then(color => {
+        if (color) {
+            ws.send(JSON.stringify({
+                ...color,
+                timestamp: Date.now(),
+                source: 'iss-stream'
+            }));
+        }
+    });
+    
+    ws.on('close', () => {
+        console.log('WebSocket 클라이언트 연결 해제됨');
+    });
 });
 
 // 프로세스 종료 시 정리
@@ -487,11 +423,6 @@ process.on('SIGINT', () => {
         });
         fs.rmdirSync(tempDir);
     }
-    
-    // WebSocket 클라이언트들 정리
-    wss.clients.forEach(client => {
-        client.close();
-    });
     
     process.exit(0);
 });

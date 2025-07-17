@@ -95,14 +95,8 @@
         function connectWebSocket() {
             // 현재 페이지의 호스트와 포트를 사용하여 WebSocket 연결
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const host = window.location.hostname;
-            const port = window.location.port;
-            
-            // 포트가 있으면 포트 포함, 없으면 기본 포트 사용
-            const wsUrl = port ? `${protocol}//${host}:${port}` : `${protocol}//${host}`;
-            
-            console.log('WebSocket 연결 시도:', wsUrl);
-            ws = new WebSocket(wsUrl);
+            const host = window.location.host;
+            ws = new WebSocket(`${protocol}//${host}`);
             
             ws.onopen = function() {
                 console.log('WebSocket 연결됨');
@@ -166,20 +160,17 @@
             colorDisplay.style.borderColor = textColor;
         }
         
-        // 연결 상태 업데이트
         function updateConnectionStatus(status, color) {
             const statusElement = document.getElementById('connection-status');
             statusElement.textContent = status;
-            statusElement.style.color = color;
+            // 연결 상태는 항상 잘 보이도록 밝은 색상 사용
+            statusElement.style.color = color === 'green' ? '#00ff00' : '#ff0000';
         }
         
         function updateLastUpdate() {
             const now = new Date();
-            // 뉴욕 시간으로 변환
-            const nyTime = now.toLocaleString("en-US", {timeZone: "America/New_York"});
-            const nyDate = new Date(nyTime);
-            const timeString = nyDate.toLocaleTimeString();
-            document.getElementById('last-update').textContent = timeString + ' (NY)';
+            const timeString = now.toLocaleTimeString();
+            document.getElementById('last-update').textContent = timeString;
         }
     </script>
 </body>
